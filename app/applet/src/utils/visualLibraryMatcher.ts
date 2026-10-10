@@ -61,7 +61,7 @@ function tokenize(text: string): string[] {
     .map(stem);
 }
 
-// Lightweight pilot 25 assets array to prevent heavy static JSON imports that break Rolldown
+// Lightweight pilot 25 assets array
 const pilot25Assets: VisualAsset[] = [
   { id: 'pilot_kyc_verification', file: 'NFBC_SOP_Visual_Library_FINAL/pilot_25/kyc_verification.webp', tags: ['kyc', 'verification', 'identity', 'document'], category: 'pilot_25', source_generated: true },
   { id: 'pilot_loan_disbursement', file: 'NFBC_SOP_Visual_Library_FINAL/pilot_25/loan_disbursement.webp', tags: ['loan', 'disbursement', 'cash', 'transfer'], category: 'pilot_25', source_generated: true },
@@ -151,7 +151,7 @@ const additionalNfbcAssets: VisualAsset[] = [
   }
 ];
 
-// Combine all sources safely without massive JSON imports
+// Combine all sources safely without missing JSON dependencies
 const allAssets: VisualAsset[] = [
   ...pilot25Assets,
   ...additionalNfbcAssets
