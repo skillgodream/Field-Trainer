@@ -161,7 +161,7 @@ export const SectionIntroPage: React.FC<{
         TAP EACH ONE AS YOU CHECK IT
       </div>
 
-      {/* 3. High-fidelity dynamic list items with cover images, maroon tinted overlays, & custom line outlines */}
+      {/* 3. Clean Apple-style dark cards with small image thumbnails and full text */}
       <div className="space-y-3">
         {items.map((item, idx) => {
           const isChecked = checkedStates[idx];
@@ -170,51 +170,44 @@ export const SectionIntroPage: React.FC<{
             <div
               key={idx}
               onClick={() => toggleCheck(idx)}
-              className="relative rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-slate-100 transition-all duration-300 cursor-pointer h-36 flex items-end p-5 select-none"
+              className={`relative rounded-2xl p-4 transition-all duration-300 cursor-pointer flex items-center gap-3.5 select-none border ${
+                isChecked 
+                  ? 'bg-[#1c1c1e]/90 border-emerald-500/40 shadow-[0_4px_20px_rgba(50,215,75,0.1)]' 
+                  : 'bg-[#1c1c1e]/70 border-white/10 hover:border-white/20 shadow-sm'
+              }`}
             >
-              {/* Cover Background Image */}
-              <img
-                src={item.img}
-                alt={item.title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                referrerPolicy="no-referrer"
-              />
+              {/* Small Image Thumbnail */}
+              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md bg-black/40">
+                <img
+                  src={item.img}
+                  alt={item.title}
+                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-black/20" />
+              </div>
 
-              {/* Ultra-deep translucent dark wine/black overlay to guarantee excellent legibility */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#120106]/95 via-[#180209]/85 to-[#2c040d]/15" />
+              {/* Title & Subtitle */}
+              <div className="flex-1 text-left space-y-0.5">
+                <h3 className="text-sm sm:text-base font-bold text-white leading-snug">
+                  {item.title}
+                </h3>
+                <p className="text-xs font-normal text-slate-300 leading-relaxed line-clamp-2">
+                  {item.subtitle}
+                </p>
+              </div>
 
-              {/* Screenshot 3 Custom Outline Illustration overlaying on the right */}
-              {renderOutlineIllustration(idx)}
-
-              {/* Checked Indicator Ring in the Top Right of card */}
-              <div className="absolute top-4 right-4 z-10">
+              {/* Checked Indicator Ring */}
+              <div className="shrink-0 pl-1">
                 {isChecked ? (
-                  /* Filled Green Check badge */
-                  <div className="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-md transition-all scale-110">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4.5" className="w-3.5 h-3.5 text-white">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-md scale-105">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className="w-3 h-3 text-white">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                 ) : (
-                  /* Translucent empty circular ring */
-                  <div className="w-7 h-7 rounded-full border-2 border-white/70 backdrop-blur-2xs hover:border-white transition-colors" />
+                  <div className="w-6 h-6 rounded-full border-2 border-white/30 hover:border-white/60 transition-colors" />
                 )}
-              </div>
-
-              {/* Title & Subtitle in the bottom-left with crisp soft text-shadow overlay */}
-              <div className="relative z-10 space-y-0.5 text-left pr-10">
-                <h3 
-                  className="text-lg font-black text-white leading-tight"
-                  style={{ textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 1px 3px rgba(0,0,0,0.8)' }}
-                >
-                  {item.title}
-                </h3>
-                <p 
-                  className="text-xs font-bold text-rose-100 leading-snug"
-                  style={{ textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.7)' }}
-                >
-                  {item.subtitle}
-                </p>
               </div>
             </div>
           );

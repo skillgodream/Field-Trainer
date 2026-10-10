@@ -539,7 +539,6 @@ export default function SimulatorScreen({
                   >
                     <div>
                       <strong>{choice.title}</strong>
-                      {choice.subtitle && <small>{choice.subtitle}</small>}
                     </div>
 
                     {isSelected && (

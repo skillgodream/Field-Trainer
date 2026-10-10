@@ -10,51 +10,51 @@ interface MeetGurujiScreenProps {
 export const MeetGurujiScreen: React.FC<MeetGurujiScreenProps> = ({ onContinue }) => {
   return (
     <div 
-      className="relative w-full min-h-[100dvh] sm:min-h-[780px] bg-[#070A14] text-white overflow-hidden flex flex-col justify-between p-4 sm:p-6 selection:bg-indigo-500 selection:text-white"
+      className="relative w-full min-h-[100dvh] sm:min-h-[780px] bg-black text-white overflow-hidden flex flex-col justify-between p-4 sm:p-6 selection:bg-indigo-500 selection:text-white"
       onClick={onContinue}
     >
       {/* 1. Premium Blurred Background Image with Vignette & Glowing Orbs */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-[#070A14]">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-black">
         {/* Dynamic, CSS-Only Premium Mesh Gradient Fallback */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-[#02040a] via-[#070a1e] to-[#120822] opacity-100" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-black via-[#0a0a0c] to-[#121214] opacity-100" />
         
         {/* Ambient Glowing Orbs */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] rounded-full bg-indigo-600/15 blur-[120px]" />
-        <div className="absolute top-1/3 right-[-10%] w-[380px] h-[380px] rounded-full bg-[#3B82F6]/20 blur-[100px]" />
-        <div className="absolute bottom-1/4 left-[-10%] w-[380px] h-[380px] rounded-full bg-[#8B5CF6]/15 blur-[110px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] rounded-full bg-indigo-600/10 blur-[120px]" />
+        <div className="absolute top-1/3 right-[-10%] w-[380px] h-[380px] rounded-full bg-[#3B82F6]/10 blur-[100px]" />
+        <div className="absolute bottom-1/4 left-[-10%] w-[380px] h-[380px] rounded-full bg-[#8B5CF6]/10 blur-[110px]" />
 
         {/* High-res harbor / city dusk background heavily blurred */}
         <img
           src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1200&q=80"
           alt="Premium Background"
-          className="w-full h-full object-cover filter blur-[90px] scale-125 opacity-25 brightness-50 transition-opacity duration-1000"
+          className="w-full h-full object-cover filter blur-[90px] scale-125 opacity-15 brightness-50 transition-opacity duration-1000"
           referrerPolicy="no-referrer"
           onError={(e) => {
             (e.target as HTMLImageElement).style.opacity = '0';
           }}
         />
         {/* Dark Vignette Overlay for perfect footers blending */}
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#070A14] to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#070A14]/40 to-[#070A14]" />
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
       </div>
 
-      {/* 2. Center Hero Koala Coach Visual (30% Larger Avatar) */}
+      {/* 2. Center Hero Koala Coach Visual (Balanced Proportioned Avatar) */}
       <div className="relative z-10 my-auto flex flex-col items-center justify-center py-4 shrink-0">
-        <div className="relative w-84 h-84 sm:w-[480px] sm:h-[480px] flex items-center justify-center">
+        <div className="relative w-64 h-64 sm:w-80 sm:h-80 flex items-center justify-center">
           {/* Glowing Shield / Teardrop Organic Contour Badge */}
-          <div className="absolute inset-0 rounded-[72px] bg-gradient-to-br from-indigo-500/15 via-blue-600/10 to-purple-600/15 border border-white/10 shadow-[0_0_100px_rgba(79,70,229,0.3)] backdrop-blur-md transform rotate-[-1.5deg]" />
+          <div className="absolute inset-0 rounded-[50px] bg-gradient-to-br from-indigo-500/15 via-blue-600/10 to-purple-600/15 border border-white/10 shadow-[0_0_60px_rgba(79,70,229,0.2)] backdrop-blur-md transform rotate-[-1.5deg]" />
           
-          {/* 3D Koala Coach Avatar (30% Bigger & Perfectly Proportioned) */}
+          {/* 3D Koala Coach Avatar */}
           <motion.div
-            animate={{ y: [0, -10, 0] }}
+            animate={{ y: [0, -8, 0] }}
             transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-            className="relative z-10 w-full h-full flex items-center justify-center p-2 scale-135 sm:scale-145"
+            className="relative z-10 w-full h-full flex items-center justify-center p-3"
           >
             <img
               src="/Coachguru.png"
               alt="Guruji Koala Coach"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain filter drop-shadow-[0_30px_60px_rgba(0,0,0,0.7)]"
+              className="w-full h-full object-contain filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = gurujiImg || "/guruji 1.png";
               }}

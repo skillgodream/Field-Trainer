@@ -102,7 +102,7 @@ export default function App() {
   // Dynamic Background Management to completely eliminate any "white patch" / light background leakage on overscroll/elastic scroll
   React.useEffect(() => {
     const isDarkTheme = (activeTab === 'home' && !selectedLesson && !activeSimulator && !isIntroDeckOpen) || isIntroDeckOpen || analyzingSop !== null || isProcessing;
-    const targetColor = isDarkTheme ? '#070A14' : '#F7F7F5';
+    const targetColor = isDarkTheme ? '#000000' : '#F7F7F5';
     document.body.style.backgroundColor = targetColor;
     document.documentElement.style.backgroundColor = targetColor;
   }, [activeTab, selectedLesson, activeSimulator, isIntroDeckOpen, analyzingSop, isProcessing]);
