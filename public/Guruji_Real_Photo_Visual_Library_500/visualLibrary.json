@@ -1,0 +1,11 @@
+{
+  "assets": [
+    {
+      "id": "pilot_kyc_verification",
+      "file": "NFBC_SOP_Visual_Library_FINAL/pilot_25/kyc_verification.webp",
+      "tags": ["kyc", "verification", "identity", "document"],
+      "category": "pilot_25",
+      "source_generated": true
+    }
+  ]
+}
