@@ -442,18 +442,6 @@ export default function SimulatorScreen({
               >
                 ← Back
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playTap();
-                  onClose();
-                }}
-                className="cancel-btn"
-                aria-label="Cancel session"
-                title="Cancel session"
-              >
-                ✕ Cancel
-              </button>
               <span>GURUJI · WORK COACH</span>
             </div>
             <div className="live">
@@ -500,39 +488,16 @@ export default function SimulatorScreen({
                   : ''
               }`}
             >
-              <div className="heroInner">
-                <div className="taskHead">
+              <div className="heroInner" style={{ padding: '16px 20px' }}>
+                <div className="taskHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h2 className="taskTitle">{step.title}</h2>
-                    <div className="taskSub">
-                      {(step as any).taskOrder || lesson?.title || 'SOP'} · {step.item || step.sku || 'Standard Task'}
+                    <h2 className="taskTitle" style={{ fontSize: '18px', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>{step.title}</h2>
+                    <div className="taskSub" style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.8)', marginTop: '2px' }}>
+                      {(step as any).taskOrder || lesson?.title || 'SOP Standard'}
                     </div>
                   </div>
-                  <span className="priority">{currentPriority}</span>
+                  <span className="priority" style={{ fontSize: '8px', padding: '3px 8px', fontWeight: 900 }}>{currentPriority}</span>
                 </div>
-
-                <div className="item">
-                  <div className="itemIcon">{getStepIcon(step.type, step.priority)}</div>
-                  <div>
-                    <b>{currentItemLabel}</b>
-                    <span>{currentItemSub}</span>
-                  </div>
-                </div>
-
-                {step.type !== 'menu' && (
-                  <div className="target">
-                    <div className="targetBox">
-                      <label>{targetLabel}</label>
-                      <strong>{targetVal}</strong>
-                    </div>
-                    <div className="targetBox qty">
-                      <label>Qty</label>
-                      <strong>{qtyVal}</strong>
-                    </div>
-                  </div>
-                )}
-
-                
               </div>
             </div>
           </section>
