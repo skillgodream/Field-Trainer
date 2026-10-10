@@ -73,14 +73,12 @@ export const ObjectivesPage: React.FC<{
 
   return (
     <div className="space-y-4 text-left">
-      {/* 1. Header Blue Card exactly matching Screenshot 2 */}
-      <div className="bg-gradient-to-br from-[#1d3cb4] via-[#2462e3] to-[#4c84ff] rounded-3xl p-6 text-white relative overflow-hidden shadow-lg flex items-center justify-between min-h-[190px]">
-        {/* Abstract vector wave background curves */}
+      {/* 1. Header Hero Card (compact size, light style) */}
+      <div className="bg-gradient-to-br from-[#1d3cb4] via-[#2462e3] to-[#4c84ff] rounded-3xl p-5 text-white relative overflow-hidden shadow-lg flex items-center justify-between min-h-[140px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_25%,rgba(255,255,255,0.12),transparent_50%)]" />
 
-        <div className="space-y-2.5 z-10 max-w-[65%]">
-          {/* Target / Goal Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold tracking-wide backdrop-blur-sm">
+        <div className="space-y-2 z-10 max-w-[65%]">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold tracking-wide backdrop-blur-sm text-white">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-3.5 h-3.5 text-white inline shrink-0">
               <circle cx="12" cy="12" r="10" />
               <circle cx="12" cy="12" r="6" />
@@ -89,26 +87,22 @@ export const ObjectivesPage: React.FC<{
             <span className="text-white">Lesson goals</span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-white">
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-none text-white">
             {slide.title || 'What you will learn'}
           </h2>
 
-          <p className="text-xs sm:text-sm font-semibold text-blue-100/90 leading-snug">
+          <p className="text-xs font-semibold text-blue-100/90 leading-snug">
             {lead}
           </p>
         </div>
 
-        {/* Dynamic target bulls-eye graphic with custom orange diagonal arrow overlay */}
-        <div className="relative w-24 h-24 shrink-0 z-10 mr-1 select-none">
+        <div className="relative w-20 h-20 shrink-0 z-10 mr-1 select-none">
           <svg viewBox="0 0 100 100" className="w-full h-full text-white/95" stroke="currentColor" strokeWidth="2.5" fill="none">
-            {/* Target rings */}
             <circle cx="50" cy="50" r="38" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
             <circle cx="50" cy="50" r="28" stroke="rgba(255,255,255,0.3)" strokeWidth="6" />
             <circle cx="50" cy="50" r="18" stroke="rgba(255,255,255,0.5)" strokeWidth="6" />
             <circle cx="50" cy="50" r="8" stroke="rgba(255,255,255,0.8)" strokeWidth="4" />
             <circle cx="50" cy="50" r="3" fill="#f59e0b" stroke="#f59e0b" />
-            
-            {/* Crisp Diagonal Gold Arrow */}
             <line x1="18" y1="82" x2="78" y2="22" stroke="#f59e0b" strokeWidth="5" strokeLinecap="round" />
             <polyline points="58 22 78 22 78 42" stroke="#f59e0b" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -120,29 +114,26 @@ export const ObjectivesPage: React.FC<{
         {finalItems.length} GOALS
       </div>
 
-      {/* 3. List of Beautiful Goals cards */}
+      {/* 3. List of Beautiful Goals cards (light style) */}
       <div className="space-y-3">
         {finalItems.map((item, index) => {
           const paddedNum = String(index + 1).padStart(2, '0');
           return (
             <div
               key={index}
-              className="relative bg-white rounded-2xl p-4 pl-6 border border-slate-100 shadow-xs flex items-center gap-4 min-h-[82px] overflow-hidden"
+              className="relative bg-white rounded-2xl p-4 pl-6 border border-[#E3E8F4] shadow-xs flex items-center gap-4 min-h-[72px] overflow-hidden"
             >
-              {/* Blue left edge stripe */}
               <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-[#1d3cb4] rounded-l-2xl" />
 
-              {/* Icon Container with blue layout */}
-              <div className="w-12 h-12 rounded-2xl bg-[#eff6ff] text-[#1d3cb4] flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-10 h-10 rounded-xl bg-[#eff6ff] text-[#1d3cb4] flex items-center justify-center shrink-0 shadow-2xs">
                 {getGoalIcon(item, index)}
               </div>
 
-              {/* Text Area */}
               <div className="flex-1 space-y-0.5 text-left pr-2">
                 <div className="text-xs font-black text-[#1d3cb4] tracking-wider">
                   {paddedNum}
                 </div>
-                <h3 className="text-[12px] font-black text-slate-900 leading-tight">
+                <h3 className="text-xs sm:text-sm font-black text-[#0F1B3D] leading-tight">
                   {item}
                 </h3>
               </div>
