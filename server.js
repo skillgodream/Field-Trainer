@@ -9,13 +9,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3e3;
 app.use(express.json({ limit: "15mb" }));
-function getApiKey() {
-  const rawKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "").trim();
+function getApiKey(req) {
+  const headerKey = req ? ((typeof req.headers["x-gemini-api-key"] === "string" ? req.headers["x-gemini-api-key"] : "") || (typeof req.headers["authorization"] === "string" ? req.headers["authorization"].replace(/^Bearer\s+/i, "") : "")).trim() : "";
+  const rawKey = (headerKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "").trim();
   const cleanKey = rawKey.replace(/^["']|["']$/g, "").trim();
   return cleanKey || void 0;
 }
-function getGeminiClient() {
-  const apiKey = getApiKey();
+function getGeminiClient(req) {
+  const apiKey = getApiKey(req);
   if (!apiKey) return null;
   return new GoogleGenAI({
     apiKey,
@@ -26,6 +27,8 @@ function getGeminiClient() {
     }
   });
 }
+const MODEL_PRO = process.env.GEMINI_PRO_MODEL || "gemini-3.1-pro-preview";
+const MODEL_FAST = process.env.GEMINI_FAST_MODEL || "gemini-3.8-flash";
 app.get("/api/health", (_req, res) => {
   const key = getApiKey();
   res.json({
@@ -36,13 +39,26 @@ app.get("/api/health", (_req, res) => {
     time: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
+app.get("/api/models", async (req, res) => {
+  const ai = getGeminiClient(req);
+  if (!ai) return res.json({ error: "no key" });
+  const out = [];
+  try {
+    for await (const m of await ai.models.list()) {
+      if (m.name) out.push(m.name);
+    }
+    res.json({ success: true, models: out });
+  } catch (err) {
+    res.json({ success: false, error: err?.message || String(err) });
+  }
+});
 app.post("/api/pdf/extract", async (req, res) => {
   try {
     const { fileBase64, mimeType = "application/pdf", filename = "uploaded_document.pdf" } = req.body;
     if (!fileBase64 || typeof fileBase64 !== "string") {
       return res.status(400).json({ success: false, error: "No fileBase64 data provided." });
     }
-    const aiClient = getGeminiClient();
+    const aiClient = getGeminiClient(req);
     if (!aiClient) {
       console.warn("[Server PDF Extract] No Gemini API key detected on server.");
       return res.json({ success: false, useLocal: true, reason: "GEMINI_API_KEY missing on server" });
@@ -93,16 +109,16 @@ Do NOT summarize. Return JSON:
     let response;
     try {
       response = await aiClient.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: MODEL_PRO,
         contents: { parts: [docPart, { text: prompt }] },
         config: {
           responseMimeType: "application/json"
         }
       });
     } catch (primaryErr) {
-      console.warn("[Server PDF Extract] Primary model gemini-3.8-flash failed, trying gemini-flash-latest:", primaryErr?.message);
+      console.warn(`[Server PDF Extract] Primary model ${MODEL_PRO} failed, trying ${MODEL_FAST}:`, primaryErr?.message);
       response = await aiClient.models.generateContent({
-        model: "gemini-flash-latest",
+        model: MODEL_FAST,
         contents: { parts: [docPart, { text: prompt }] },
         config: {
           responseMimeType: "application/json"
@@ -135,7 +151,7 @@ Do NOT summarize. Return JSON:
 app.post("/api/gemini/generate-blueprint", async (req, res) => {
   try {
     const { rawText, fileBase64, mimeType, filename, fileHash, pageCount, wordCount } = req.body;
-    const aiClient = getGeminiClient();
+    const aiClient = getGeminiClient(req);
     if (!aiClient) {
       console.warn("[Server /api/gemini/generate-blueprint] No Gemini API key found in environment.");
       return res.json({
@@ -156,24 +172,49 @@ app.post("/api/gemini/generate-blueprint", async (req, res) => {
       });
     }
     const systemInstruction = `You are a World-Class Lead Operational Intelligence Engineer and Instructional Designer for Guruji Work Coach.
-Your task is to transform an uploaded Standard Operating Procedure (SOP) into a deep, high-fidelity, simulation-grade OPERATIONAL BLUEPRINT.
+LAW 3 \u2014 UNIVERSAL 8-STAGE OPERATIONAL LEARNING FRAMEWORK
+The 8 stages are the Brain's universal framework for analysing and organising ANY SOP.
+They are NOT a mandatory 8-slide structure.
+The Brain must examine the SOP through all 8 stages and use only the stages that contain meaningful source-supported content. It may combine, expand or skip stages depending on the SOP.
+
+1. ORIENT: What is the job/task? Why is it being done? What is the expected outcome? What is the worker responsible for?
+2. PREPARE: What must the worker check, arrange, confirm or understand before starting? (Tools, information, prerequisites, environment, customer/patient/order details).
+3. PERFORM: What does the worker actually do? Extract the real operational steps and preserve their correct sequence.
+4. CONTROL: What must the worker verify while performing the task? Include safety, quality, accuracy, compliance, customer, equipment or other critical controls.
+5. DECIDE: Where does the worker need to make a judgement? Identify the condition, available actions and the correct SOP-supported response.
+6. HANDLE: What happens when the normal process does not go as expected? Include exceptions, unusual conditions, missing information, failed checks or process deviations.
+7. ESCALATE: When is the issue beyond the worker's authority or capability? Identify when to stop, who/what to escalate to and what must happen before continuing.
+8. PROVE: What does the worker need to demonstrate to show that the critical learning has been understood? Use the most important steps, controls, decisions or exceptions from the SOP.
+
+SYNTHESIS RULE:
+SOP \u2192 analyse through 8 stages \u2192 identify meaningful content \u2192 remove duplication \u2192 preserve critical details \u2192 arrange progressively \u2192 create the required training pages.
+- Do NOT force an SOP into all 8 stages.
+- Do NOT create empty pages just because a stage exists.
+- Do NOT invent content to fill a stage.
+- The 8 stages control the Brain's thinking and sequencing; the SOP controls the actual content.
 
 CRITICAL ARCHITECTURAL RULES:
-1. DEEP REALISM & UNCOMPROMISING SPECIFICITY:
-   - Ground ALL extractions strictly and verbatim in the provided SOP document.
-   - Extract the TRUE frontline role (e.g. Quick Commerce Picker, Phlebotomist, Residential Housekeeping Specialist, Retail Cashier).
-   - Every scenario question must put the worker in a concrete, high-stakes operational situation directly based on the SOP details (specific product names, equipment, barcodes, shelf codes, temperatures, error codes, edge cases, exceptions).
+1. CONCISE WORKPLACE LANGUAGE (NO RAW TEXT DUMPS):
+   - NEVER output long, run-on paragraph sentences concatenating multiple SOP lines.
+   - Summarize every choice title into a crisp, COMPLETE, 5-12 word action statement written in natural workplace language.
+   - NEVER end a choice title on a dangling conjunction or preposition (e.g., 'and', 'or', 'to', 'with', 'for'). Ensure every title is a full, grammatically complete action phrase.
+   - Keep scenario questions under 2 concise sentences focused on a single execution dilemma.
+2. DEEP REALISM & UNCOMPROMISING SPECIFICITY:
+   - Ground ALL extractions strictly in the operational facts of the provided SOP document.
+   - Extract the TRUE frontline role (e.g. Quick Commerce Picker, Phlebotomist, Residential Housekeeping Specialist, Retail Cashier, Primary School Teacher, Aviation Gate Agent).
+   - Every scenario question must put the worker in a concrete, high-stakes operational situation directly based on the SOP details (specific equipment, classroom prep, barcodes, shelf codes, temperatures, error codes, edge cases, exceptions).
    - NEVER generate generic questions like "What is your required action?" or "How should you complete this task?" or "Before taking the next step, what details must you verify?".
    - NEVER generate generic choices like "Skip step and proceed" or "Use unverified shortcut". Create REALISTIC frontline errors, tempting shortcuts, and common mistakes that real workers actually make on the floor!
-2. THREE NUANCED CHOICES WITH EXPLICIT FAILURE MODES:
-   - For EACH operational step, you MUST generate exactly 3 nuanced choices:
-     * Choice 1 (isCorrect: true): The precise, compliant SOP action with actionable steps. Subtitle explaining why this is correct per SOP.
-     * Choice 2 (isCorrect: false): A realistic, tempting operational shortcut or common rushed mistake that workers often make. Subtitle explicitly details the failure consequence (e.g., inventory mismatch, customer complaint, safety hazard).
-     * Choice 3 (isCorrect: false): An unapproved workaround or procedural bypass. Subtitle details the regulatory, safety, or quality violation.
-3. EXPERT COACH TIPS & SPECIFIC HINTS:
+3. THREE NUANCED CHOICES WITH EXPLICIT FAILURE MODES:
+   - For EACH operational step, you MUST generate exactly 3 nuanced choices with short, complete, clear titles (5 to 12 words):
+     * Choice 1 (isCorrect: true): Concise, complete, compliant SOP action title. Subtitle explaining why this is correct per SOP.
+     * Choice 2 (isCorrect: false): Concise, complete, tempting operational shortcut title. Subtitle explicitly details the failure consequence (e.g., inventory mismatch, customer complaint, safety hazard).
+     * Choice 3 (isCorrect: false): Concise, complete, unapproved workaround title. Subtitle details the regulatory, safety, or quality violation.
+3. EXPERT COACH TIPS, SPECIFIC HINTS & LUCIDE VECTOR ICONS:
    - coach_tip: Guruji's practical wisdom directly referencing the subtle details, pitfalls, or mnemonic tips from the SOP.
    - hint: Specific reference to the SOP document section, visual cues, or indicators.
    - target_code: Authentic code extracted from or reflecting the SOP (e.g., LOC-A02-04, SKU-88421, FORM-Q7).
+   - icon_key: Assign a domain-appropriate, clean Lucide vector icon key for each operational step, tool, and safety rule (e.g., ShieldAlert, ScanBarcode, Thermometer, Microscope, Boxes, FileCheck, Droplets, Sparkles, SprayCan, Syringe, ClipboardCheck, Users, CheckCircle, AlertTriangle, Zap, Scale, Truck, Lock, Settings). Match the icon meaningfully to the operational step \u2014 no arbitrary overfitting or underfitting.
 4. METADATA VS OPERATIONAL CONTENT:
    - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories, ISO reference codes.
    - OPERATIONAL CONTENT (MUST DRIVE BLUEPRINT): Physical actions, system entries, verbal communications, verifications, decision points, exception handling, escalations.
@@ -280,43 +321,33 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
     let response;
     try {
       response = await aiClient.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: MODEL_PRO,
         contents: { parts },
         config: {
           systemInstruction,
           responseMimeType: "application/json",
-          maxOutputTokens: 8192,
+          maxOutputTokens: 32768,
           temperature: 0.25
         }
       });
     } catch (primaryErr) {
-      console.warn("[Server LLM Blueprint] Primary model gemini-3.8-flash failed, trying gemini-flash-latest:", primaryErr?.message);
+      console.warn(`[Server LLM Blueprint] Primary model ${MODEL_PRO} failed, trying ${MODEL_FAST}:`, primaryErr?.message);
       response = await aiClient.models.generateContent({
-        model: "gemini-flash-latest",
+        model: MODEL_FAST,
         contents: { parts },
         config: {
           systemInstruction,
           responseMimeType: "application/json",
-          maxOutputTokens: 8192,
+          maxOutputTokens: 32768,
           temperature: 0.25
         }
       });
     }
     const outputText = response.text || "";
-    let cleanJson = outputText.trim();
-    if (cleanJson.startsWith("```json")) {
-      cleanJson = cleanJson.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
-    } else if (cleanJson.startsWith("```")) {
-      cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+    if (!outputText.trim()) {
+      return res.json({ success: false, useLocalGenerator: true, error: "Empty response received from LLM" });
     }
-    if (!cleanJson.startsWith("{") && cleanJson.includes("{")) {
-      cleanJson = cleanJson.slice(cleanJson.indexOf("{"));
-      const lastBrace = cleanJson.lastIndexOf("}");
-      if (lastBrace !== -1) {
-        cleanJson = cleanJson.slice(0, lastBrace + 1);
-      }
-    }
-    const parsedData = JSON.parse(cleanJson);
+    const parsedData = cleanAndRepairJson(outputText);
     console.log(`[Server /api/gemini/generate-blueprint SUCCESS] Extracted ${parsedData.operational_steps?.length || 0} high-fidelity steps from '${filename}'`);
     return res.json({
       success: true,
@@ -324,15 +355,6 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
     });
   } catch (err) {
     console.error("[Server /api/gemini/generate-blueprint Error]:", err?.message || err);
-    if (err instanceof SyntaxError) {
-      return res.status(502).json({
-        success: false,
-        useLocalGenerator: true,
-        error: "JSON_PARSE_ERROR",
-        message: "The model output was malformed or truncated.",
-        details: err.message
-      });
-    }
     return res.json({
       success: false,
       useLocalGenerator: true,
@@ -345,7 +367,7 @@ app.post("/api/coach", async (req, res) => {
   if (!prompt) {
     return res.status(400).json({ error: "Missing prompt in request body" });
   }
-  const aiClient = getGeminiClient();
+  const aiClient = getGeminiClient(req);
   if (!aiClient) {
     console.error("[API Error] GEMINI_API_KEY is not defined in deployment environment variables.");
     return res.status(500).json({ error: "Server configuration error: Missing API Key" });
@@ -366,7 +388,7 @@ app.post("/api/coach", async (req, res) => {
     let response;
     try {
       response = await aiClient.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: MODEL_PRO,
         contents: contentsPayload,
         config: {
           systemInstruction: systemInstruction || "You are an expert assistant. Respond strictly with valid JSON.",
@@ -376,9 +398,9 @@ app.post("/api/coach", async (req, res) => {
         }
       });
     } catch (primaryErr) {
-      console.warn("[Server /api/coach] Primary model failed, trying fallback gemini-flash-latest:", primaryErr?.message);
+      console.warn(`[Server /api/coach] Primary model ${MODEL_PRO} failed, trying fallback ${MODEL_FAST}:`, primaryErr?.message);
       response = await aiClient.models.generateContent({
-        model: "gemini-flash-latest",
+        model: MODEL_FAST,
         contents: contentsPayload,
         config: {
           systemInstruction: systemInstruction || "You are an expert assistant. Respond strictly with valid JSON.",
@@ -389,21 +411,22 @@ app.post("/api/coach", async (req, res) => {
       });
     }
     const rawText = response.text || "";
-    const cleanedText = rawText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-    if (!cleanedText) {
+    if (!rawText.trim()) {
       return res.status(502).json({ error: "Empty response received from LLM" });
     }
-    const parsedData = JSON.parse(cleanedText);
-    return res.status(200).json(parsedData);
-  } catch (error) {
-    console.error("[API Error] LLM generation failed:", error);
-    if (error instanceof SyntaxError) {
+    try {
+      const parsedData = cleanAndRepairJson(rawText);
+      return res.status(200).json(parsedData);
+    } catch (parseError) {
+      console.error("[API Error /api/coach] cleanAndRepairJson failed:", parseError);
       return res.status(502).json({
         error: "JSON_PARSE_ERROR",
         message: "The model output was malformed or truncated.",
-        details: error.message
+        details: parseError.message
       });
     }
+  } catch (error) {
+    console.error("[API Error /api/coach] LLM generation failed:", error);
     return res.status(500).json({
       error: "LLM_PROVIDER_ERROR",
       message: error.message || "Failed to generate response"
@@ -433,3 +456,159 @@ if (process.env.NODE_ENV === "production") {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`[Server] Express server running on http://0.0.0.0:${PORT}`);
 });
+function sanitizeJsonString(str) {
+  let result = "";
+  let inString = false;
+  let isEscaped = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (inString) {
+      if (isEscaped) {
+        result += ch;
+        isEscaped = false;
+      } else if (ch === "\\") {
+        result += ch;
+        isEscaped = true;
+      } else if (ch === '"') {
+        const rest = str.slice(i + 1).trimStart();
+        if (rest.startsWith(":") || rest.startsWith(",") || rest.startsWith("}") || rest.startsWith("]")) {
+          result += ch;
+          inString = false;
+        } else {
+          result += '\\"';
+        }
+      } else if (ch === "\n") {
+        result += "\\n";
+      } else if (ch === "\r") {
+        result += "\\r";
+      } else if (ch === "	") {
+        result += "\\t";
+      } else {
+        result += ch;
+      }
+    } else {
+      result += ch;
+      if (ch === '"') {
+        inString = true;
+      }
+    }
+  }
+  return result;
+}
+function repairTruncatedJson(jsonStr) {
+  let text = jsonStr.trim();
+  text = text.replace(/```$/g, "").trim();
+  text = text.replace(/,?\s*"[^"]*"\s*:\s*$/, "");
+  text = text.replace(/,?\s*"[^"]*$/, "");
+  text = text.replace(/[,:\s]+$/, "");
+  let inString = false;
+  let isEscaped = false;
+  const stack = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (ch === "\\") {
+        isEscaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === "{" || ch === "[") {
+        stack.push(ch);
+      } else if (ch === "}" || ch === "]") {
+        if (stack.length > 0) stack.pop();
+      }
+    }
+  }
+  if (inString) {
+    text += '"';
+  }
+  text = text.replace(/[,:\s]+$/, "");
+  while (stack.length > 0) {
+    const opening = stack.pop();
+    if (opening === "{") {
+      text += "}";
+    } else if (opening === "[") {
+      text += "]";
+    }
+  }
+  text = text.replace(/,\s*([\}\]])/g, "$1");
+  return text;
+}
+function extractJsonBlock(text) {
+  const firstBrace = text.indexOf("{");
+  const firstBracket = text.indexOf("[");
+  let startIdx = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    startIdx = firstBrace < firstBracket ? firstBrace : firstBracket;
+  } else if (firstBrace !== -1) {
+    startIdx = firstBrace;
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+  }
+  if (startIdx === -1) {
+    return text;
+  }
+  let inString = false;
+  let isEscaped = false;
+  const stack = [];
+  for (let i = startIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+      } else if (ch === "\\") {
+        isEscaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === "{" || ch === "[") {
+        stack.push(ch);
+      } else if (ch === "}" || ch === "]") {
+        const top = stack[stack.length - 1];
+        if (ch === "}" && top === "{" || ch === "]" && top === "[") {
+          stack.pop();
+          if (stack.length === 0) {
+            return text.slice(startIdx, i + 1);
+          }
+        }
+      }
+    }
+  }
+  return text.slice(startIdx);
+}
+function cleanAndRepairJson(rawText) {
+  if (!rawText || !rawText.trim()) throw new Error("Empty text response from model");
+  let text = rawText.trim();
+  text = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+  text = extractJsonBlock(text);
+  try {
+    return JSON.parse(text);
+  } catch (e1) {
+    try {
+      const sanitized = sanitizeJsonString(text);
+      return JSON.parse(sanitized);
+    } catch (e2) {
+      try {
+        const sanitized = sanitizeJsonString(text);
+        const repaired = repairTruncatedJson(sanitized);
+        return JSON.parse(repaired);
+      } catch (e3) {
+        try {
+          const repairedRaw = repairTruncatedJson(text);
+          return JSON.parse(repairedRaw);
+        } catch (e4) {
+          console.error("[cleanAndRepairJson FAIL] Unrepairable JSON response from LLM:", text.slice(0, 300));
+          throw new Error("MALFORMED_LLM_JSON_OUTPUT");
+        }
+      }
+    }
+  }
+}
