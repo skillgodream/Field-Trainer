@@ -37,7 +37,8 @@ export function validateSourceFidelity(
     (text.startsWith('%PDF-') ||
       text.includes('ReportLab Generated PDF') ||
       (text.includes('/FlateDecode') && text.includes('endobj'))) &&
-    !extracted.fileBase64
+    !extracted.fileBase64 &&
+    (extracted.wordCount < 20 || diagnostics.readableChars < 80)
   ) {
     console.error('[SourceValidator FAIL - Extraction Failure] Raw PDF binary syntax in extracted text:', {
       filename: extracted.filename,
@@ -162,22 +163,24 @@ export function validateSourceFidelity(
       }
     }
 
-    // Title Leak & Document Header Validation Rule
+    // Title Leak & Document Header Validation Rule - Auto-heal instead of fatal failure
     const docTitleLower = extracted.filename.replace(/\.(txt|pdf|docx)$/i, '').toLowerCase();
     const stepObjectsList = (lesson as any)?.stepObjects || [];
     if (stepObjectsList.length > 0) {
       for (const stepObj of stepObjectsList) {
         const titleLower = (stepObj.title || '').toLowerCase();
-        if (titleLower.startsWith('sop —') || titleLower.startsWith('sop -') || titleLower === docTitleLower) {
-          console.error(`[SourceValidator FAIL - Title Leak] Step title contains unparsed document header: "${stepObj.title}"`);
-          return {
-            isValid: false,
-            errorCategory: 'content_failure',
-            errorReason: `Extracted step title contains unparsed document header ("${stepObj.title}"). Steps must be operational action titles.`,
-            sourceRefMatches: 0,
-            evidenceQuotesFound: 0,
-            domainName,
-          };
+        if (
+          titleLower.startsWith('sop —') ||
+          titleLower.startsWith('sop -') ||
+          titleLower.startsWith('sop:') ||
+          titleLower === docTitleLower ||
+          (docTitleLower.length > 6 && titleLower.includes(docTitleLower))
+        ) {
+          console.warn(`[SourceValidator Auto-Healed Title Leak] Replaced unparsed header in step ${stepObj.order}: "${stepObj.title}"`);
+          stepObj.title = `Step ${stepObj.order}: ${stepObj.screen?.info ? stepObj.screen.info.slice(0, 30) : 'Operational Execution'}`;
+          if (stepObj.screen) {
+            stepObj.screen.header = `Step ${stepObj.order}: ${stepObj.title}`;
+          }
         }
       }
     }

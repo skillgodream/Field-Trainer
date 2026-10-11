@@ -61,7 +61,25 @@ export async function extractTextFromPdf(
 
       return { text: fullText.trim(), pageCount };
     } catch (err) {
-      console.warn('[PDF Service] PDF text extraction failed:', err);
+      console.warn('[PDF Service] PDF text extraction failed, attempting direct buffer decode:', err);
+      try {
+        const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
+        const decoder = new TextDecoder('latin1');
+        const pdfContent = decoder.decode(buffer);
+        const textChunks: string[] = [];
+        const tjMatches = pdfContent.match(/\(([^)]{2,})\)\s*(?:Tj|'|")/g);
+        if (tjMatches) {
+          tjMatches.forEach((m) => {
+            const inner = m.replace(/\s*(?:Tj|'|")$/, '').replace(/^\(/, '').replace(/\)$/, '').trim();
+            if (inner.length > 0 && !/^[\x00-\x1F]+$/.test(inner)) textChunks.push(inner);
+          });
+        }
+        if (textChunks.length >= 3) {
+          return { text: textChunks.join(' ').replace(/\s+/g, ' ').trim(), pageCount: 1 };
+        }
+      } catch (fallbackErr) {
+        console.warn('[PDF Service] Direct buffer decode fallback failed:', fallbackErr);
+      }
       return { text: '', pageCount: 0 };
     }
   })();

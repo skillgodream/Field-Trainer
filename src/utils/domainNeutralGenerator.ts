@@ -93,11 +93,11 @@ export function buildSopKnowledgeModel(extracted: ExtractedDocument): SopKnowled
   rawLines.forEach((line, idx) => {
     if (line.match(/^(section|chapter|part)\s+\d+/i) || (line.length < 50 && line.endsWith(':') && !line.includes(' '))) {
       currentSection = line.replace(/[:\#]/g, '').trim();
-    } else if (isOperationalContent(line)) {
+    } else if (isOperationalContent(line, extracted.filename)) {
       const parts = line.split(/(?<=[.!?])\s+/);
       parts.forEach((p) => {
         const clean = p.replace(/^[\d\.\-\*\•]\s*/, '').trim();
-        if (clean.length > 12 && isOperationalContent(clean)) {
+        if (clean.length > 12 && isOperationalContent(clean, extracted.filename)) {
           const pageNum = Math.min(extracted.pageCount, Math.ceil((stepsList.length + 1) / 2));
           stepsList.push({
             id: stepsList.length + 1,
@@ -423,7 +423,16 @@ function createScenarioQuestionFromStep(
   const choiceDistractor1Title = toActionTitle(item.choices?.[1]?.title || (item.choices?.[1] as any)?.text || `Skip step ${index + 1} to save time`, 14);
   const choiceDistractor2Title = toActionTitle(item.choices?.[2]?.title || (item.choices?.[2] as any)?.text || `Bypass check and report later`, 14);
 
-  const title = item.task_title || toActionTitle(`${item.action_verb || 'Execute'} ${instruction}`, 6);
+  let title = item.task_title || toActionTitle(`${item.action_verb || 'Execute'} ${instruction}`, 6);
+  const titleLow = title.toLowerCase();
+  const processLow = process.toLowerCase();
+  if (
+    titleLow.startsWith('sop') ||
+    titleLow === processLow ||
+    (processLow.length > 5 && titleLow.includes(processLow))
+  ) {
+    title = `Step ${index + 1}: ${item.action_verb || 'Execute'} Action`;
+  }
 
   return {
     title,
@@ -538,17 +547,28 @@ export function generateLessonFromOperationalBlueprint(
     };
   });
 
-  const stepObjects: StepObject[] = simulatorSteps.map((simStep, idx) => ({
-    id: `step_${idx + 1}`,
-    order: idx + 1,
-    title: simStep.title,
-    icon: '📋',
-    purpose: idx % 2 === 0 ? 'skill' : 'understanding',
-    component: 'choice_list',
-    screen: {
-      header: `Step ${idx + 1}: ${simStep.title}`,
-      info: simStep.evidence || simStep.why,
-    },
+  const stepObjects: StepObject[] = simulatorSteps.map((simStep, idx) => {
+    let cleanTitle = simStep.title;
+    const titleLow = (cleanTitle || '').toLowerCase();
+    const processLow = process.toLowerCase();
+    if (
+      titleLow.startsWith('sop') ||
+      titleLow === processLow ||
+      (processLow.length > 5 && titleLow.includes(processLow))
+    ) {
+      cleanTitle = `Step ${idx + 1}: ${toActionTitle(simStep.taskTitle || simStep.question || 'Execution Protocol', 4)}`;
+    }
+    return {
+      id: `step_${idx + 1}`,
+      order: idx + 1,
+      title: cleanTitle,
+      icon: '📋',
+      purpose: idx % 2 === 0 ? 'skill' : 'understanding',
+      component: 'choice_list',
+      screen: {
+        header: `Step ${idx + 1}: ${cleanTitle}`,
+        info: simStep.evidence || simStep.why,
+      },
     coach_say: simStep.coachTip || `Follow the written ${role} procedure rule.`,
     question: simStep.question,
     options: simStep.choices.map((c, cIdx) => ({
@@ -568,7 +588,8 @@ export function generateLessonFromOperationalBlueprint(
     risk: simStep.priority === 'High Priority' ? 'compliance' : 'normal',
     source_ref: simStep.source_ref || 'S1',
     hotspots: null,
-  }));
+  };
+});
 
   const customerImpact = (opBlueprint.customer_or_business_impact || [])[0]?.impact || `Adhering to ${process} ensures service quality and safety.`;
   const criticalControlRule = (opBlueprint.critical_controls || [])[0]?.rule || `Never bypass mandatory verification steps or operate outside written guidelines.`;
@@ -846,6 +867,7 @@ export function generateLessonFromOperationalBlueprint(
     passport,
     operationalBlueprint: opBlueprint,
     videoPlan,
+    stepObjects,
   };
 
   return { lesson, passport, blueprint, stepObjects };

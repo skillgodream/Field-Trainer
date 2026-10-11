@@ -3,12 +3,55 @@ import { GoogleGenAI, GenerateVideosOperation } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function extractDocxTextFromBuffer(buffer: Buffer): string {
+  try {
+    let offset = 0;
+    while (offset < buffer.length - 30) {
+      if (
+        buffer[offset] === 0x50 &&
+        buffer[offset + 1] === 0x4b &&
+        buffer[offset + 2] === 0x03 &&
+        buffer[offset + 3] === 0x04
+      ) {
+        const compMethod = buffer.readUInt16LE(offset + 8);
+        const compSize = buffer.readUInt32LE(offset + 18);
+        const nameLen = buffer.readUInt16LE(offset + 26);
+        const extraLen = buffer.readUInt16LE(offset + 28);
+        const name = buffer.toString('utf8', offset + 30, offset + 30 + nameLen);
+        const dataOffset = offset + 30 + nameLen + extraLen;
+
+        if (name === 'word/document.xml' && compSize > 0 && dataOffset + compSize <= buffer.length) {
+          const compressedData = buffer.subarray(dataOffset, dataOffset + compSize);
+          let xmlStr = '';
+          if (compMethod === 8) {
+            xmlStr = zlib.inflateRawSync(compressedData).toString('utf8');
+          } else if (compMethod === 0) {
+            xmlStr = compressedData.toString('utf8');
+          }
+          const matches = xmlStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+          if (matches && matches.length > 0) {
+            return matches.map((m) => m.replace(/<[^>]+>/g, '')).join(' ').trim();
+          }
+          break;
+        }
+        offset = dataOffset + compSize;
+      } else {
+        offset++;
+      }
+    }
+  } catch (err) {
+    console.warn('[extractDocxTextFromBuffer] Error parsing docx zip structure:', err);
+  }
+  return '';
+}
 
 const videosDir = path.resolve(process.cwd(), 'uploads', 'videos');
 if (!fs.existsSync(videosDir)) {
@@ -107,27 +150,26 @@ app.post('/api/pdf/extract', async (req, res) => {
       return res.status(400).json({ success: false, error: 'No fileBase64 data provided.' });
     }
 
-    const aiClient = getGeminiClient(req);
-    if (!aiClient) {
-      console.warn('[Server PDF Extract] No Gemini API key detected on server.');
-      return res.json({ success: false, useLocal: true, reason: 'GEMINI_API_KEY missing on server' });
-    }
-
-    let docPart: any;
     let textDirect: string | null = null;
-
     const lowerName = filename.toLowerCase();
     const isDocx = lowerName.endsWith('.docx') || lowerName.endsWith('.doc') || mimeType.includes('word') || mimeType.includes('openxmlformats');
 
     if (isDocx) {
       try {
-        const decodedStr = Buffer.from(fileBase64, 'base64').toString('utf-8');
-        const xmlMatches = decodedStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
-        if (xmlMatches && xmlMatches.length > 0) {
-          textDirect = xmlMatches.map((node) => node.replace(/<[^>]+>/g, '')).join(' ');
+        const fileBuffer = Buffer.from(fileBase64, 'base64');
+        const extractedDocx = extractDocxTextFromBuffer(fileBuffer);
+        if (extractedDocx && extractedDocx.length > 10) {
+          textDirect = extractedDocx;
+        } else {
+          // Fallback to searching decoded text
+          const decodedStr = fileBuffer.toString('utf-8');
+          const xmlMatches = decodedStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+          if (xmlMatches && xmlMatches.length > 0) {
+            textDirect = xmlMatches.map((node) => node.replace(/<[^>]+>/g, '')).join(' ');
+          }
         }
       } catch (e) {
-        console.warn('[Server DOCX Extract] Direct buffer decode failed:', e);
+        console.warn('[Server DOCX Extract] Buffer decode failed:', e);
       }
     }
 
@@ -135,7 +177,7 @@ app.post('/api/pdf/extract', async (req, res) => {
       const extractedText = textDirect.trim();
       const wordCount = extractedText.split(/\s+/).filter(Boolean).length;
       const pageCount = Math.max(1, Math.ceil(wordCount / 220));
-      console.log(`[Server /api/pdf/extract SUCCESS] Direct XML decoded ${wordCount} words from '${filename}'`);
+      console.log(`[Server /api/pdf/extract SUCCESS] Direct docx extracted ${wordCount} words from '${filename}'`);
       return res.json({
         success: true,
         extractedText,
@@ -143,6 +185,14 @@ app.post('/api/pdf/extract', async (req, res) => {
         pageCount,
       });
     }
+
+    const aiClient = getGeminiClient(req);
+    if (!aiClient) {
+      console.warn('[Server PDF Extract] No Gemini API key detected on server.');
+      return res.json({ success: false, useLocal: true, reason: 'GEMINI_API_KEY missing on server' });
+    }
+
+    let docPart: any;
 
     const cleanMime = mimeType.includes('image') ? mimeType : mimeType.includes('text') ? 'text/plain' : 'application/pdf';
     docPart = {
@@ -780,9 +830,15 @@ app.all('/api/*', (req, res) => {
 // Static files in production / Vite middlewares in development
 const distPath = path.resolve(process.cwd(), 'dist');
 
-if (process.env.NODE_ENV === 'production') {
+const indexHtmlExists = fs.existsSync(path.join(distPath, 'index.html'));
+const isProduction = process.env.NODE_ENV === 'production' || (indexHtmlExists && process.env.NODE_ENV !== 'development');
+
+if (isProduction) {
   app.use(express.static(distPath));
-  app.get('*', (_req, res) => {
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ success: false, error: 'API route not found' });
+    }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {

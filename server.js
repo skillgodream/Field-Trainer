@@ -1,11 +1,56 @@
 import express from "express";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateVideosOperation } from "@google/genai";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
+import zlib from "zlib";
 import { fileURLToPath } from "url";
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+function extractDocxTextFromBuffer(buffer) {
+  try {
+    let offset = 0;
+    while (offset < buffer.length - 30) {
+      if (buffer[offset] === 80 && buffer[offset + 1] === 75 && buffer[offset + 2] === 3 && buffer[offset + 3] === 4) {
+        const compMethod = buffer.readUInt16LE(offset + 8);
+        const compSize = buffer.readUInt32LE(offset + 18);
+        const nameLen = buffer.readUInt16LE(offset + 26);
+        const extraLen = buffer.readUInt16LE(offset + 28);
+        const name = buffer.toString("utf8", offset + 30, offset + 30 + nameLen);
+        const dataOffset = offset + 30 + nameLen + extraLen;
+        if (name === "word/document.xml" && compSize > 0 && dataOffset + compSize <= buffer.length) {
+          const compressedData = buffer.subarray(dataOffset, dataOffset + compSize);
+          let xmlStr = "";
+          if (compMethod === 8) {
+            xmlStr = zlib.inflateRawSync(compressedData).toString("utf8");
+          } else if (compMethod === 0) {
+            xmlStr = compressedData.toString("utf8");
+          }
+          const matches = xmlStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+          if (matches && matches.length > 0) {
+            return matches.map((m) => m.replace(/<[^>]+>/g, "")).join(" ").trim();
+          }
+          break;
+        }
+        offset = dataOffset + compSize;
+      } else {
+        offset++;
+      }
+    }
+  } catch (err) {
+    console.warn("[extractDocxTextFromBuffer] Error parsing docx zip structure:", err);
+  }
+  return "";
+}
+const videosDir = path.resolve(process.cwd(), "uploads", "videos");
+if (!fs.existsSync(videosDir)) {
+  fs.mkdirSync(videosDir, { recursive: true });
+}
+function getSafeVideoPath(lessonId, clipIndex = 1) {
+  const safeId = lessonId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.join(videosDir, `${safeId}_clip_${clipIndex}.mp4`);
+}
 const app = express();
 const PORT = Number(process.env.PORT) || 3e3;
 app.use(express.json({ limit: "15mb" }));
@@ -58,31 +103,31 @@ app.post("/api/pdf/extract", async (req, res) => {
     if (!fileBase64 || typeof fileBase64 !== "string") {
       return res.status(400).json({ success: false, error: "No fileBase64 data provided." });
     }
-    const aiClient = getGeminiClient(req);
-    if (!aiClient) {
-      console.warn("[Server PDF Extract] No Gemini API key detected on server.");
-      return res.json({ success: false, useLocal: true, reason: "GEMINI_API_KEY missing on server" });
-    }
-    let docPart;
     let textDirect = null;
     const lowerName = filename.toLowerCase();
     const isDocx = lowerName.endsWith(".docx") || lowerName.endsWith(".doc") || mimeType.includes("word") || mimeType.includes("openxmlformats");
     if (isDocx) {
       try {
-        const decodedStr = Buffer.from(fileBase64, "base64").toString("utf-8");
-        const xmlMatches = decodedStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
-        if (xmlMatches && xmlMatches.length > 0) {
-          textDirect = xmlMatches.map((node) => node.replace(/<[^>]+>/g, "")).join(" ");
+        const fileBuffer = Buffer.from(fileBase64, "base64");
+        const extractedDocx = extractDocxTextFromBuffer(fileBuffer);
+        if (extractedDocx && extractedDocx.length > 10) {
+          textDirect = extractedDocx;
+        } else {
+          const decodedStr = fileBuffer.toString("utf-8");
+          const xmlMatches = decodedStr.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+          if (xmlMatches && xmlMatches.length > 0) {
+            textDirect = xmlMatches.map((node) => node.replace(/<[^>]+>/g, "")).join(" ");
+          }
         }
       } catch (e) {
-        console.warn("[Server DOCX Extract] Direct buffer decode failed:", e);
+        console.warn("[Server DOCX Extract] Buffer decode failed:", e);
       }
     }
     if (textDirect && textDirect.trim().length > 10) {
       const extractedText2 = textDirect.trim();
       const wordCount2 = extractedText2.split(/\s+/).filter(Boolean).length;
       const pageCount2 = Math.max(1, Math.ceil(wordCount2 / 220));
-      console.log(`[Server /api/pdf/extract SUCCESS] Direct XML decoded ${wordCount2} words from '${filename}'`);
+      console.log(`[Server /api/pdf/extract SUCCESS] Direct docx extracted ${wordCount2} words from '${filename}'`);
       return res.json({
         success: true,
         extractedText: extractedText2,
@@ -90,6 +135,12 @@ app.post("/api/pdf/extract", async (req, res) => {
         pageCount: pageCount2
       });
     }
+    const aiClient = getGeminiClient(req);
+    if (!aiClient) {
+      console.warn("[Server PDF Extract] No Gemini API key detected on server.");
+      return res.json({ success: false, useLocal: true, reason: "GEMINI_API_KEY missing on server" });
+    }
+    let docPart;
     const cleanMime = mimeType.includes("image") ? mimeType : mimeType.includes("text") ? "text/plain" : "application/pdf";
     docPart = {
       inlineData: {
@@ -313,6 +364,20 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   "source_evidence": [
     { "id": "E1", "page_or_section": "Page 1", "excerpt": "Document excerpt" }
   ],
+  "video_demonstration_plan": {
+    "strategy": "sequential_steps",
+    "total_clips": 3,
+    "clips": [
+      {
+        "clip_index": 1,
+        "step_ref": "Step 1: Pre-inspection",
+        "title": "Safety Lockout & Gear Check",
+        "duration_seconds": 8,
+        "key_action": "Specific physical action from SOP",
+        "veo_prompt": "Cinematic 720p 16:9 instructional video shot: Frontline worker executing precise action with equipment in workplace."
+      }
+    ]
+  },
   "confidence": 0.98
 }
 
@@ -348,6 +413,58 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
       return res.json({ success: false, useLocalGenerator: true, error: "Empty response received from LLM" });
     }
     const parsedData = cleanAndRepairJson(outputText);
+    if (!parsedData.video_demonstration_plan || !Array.isArray(parsedData.video_demonstration_plan.clips) || parsedData.video_demonstration_plan.clips.length === 0) {
+      const steps = parsedData.operational_steps || [];
+      const role = parsedData.role || "Frontline worker";
+      const processName = parsedData.process || filename || "Operational Task";
+      if (steps.length <= 2) {
+        parsedData.video_demonstration_plan = {
+          strategy: "single_continuous_15s",
+          total_clips: 1,
+          clips: [{
+            clip_index: 1,
+            title: `Full Procedure: ${processName.slice(0, 36)}`,
+            duration_seconds: 15,
+            key_action: steps[0]?.instruction || processName,
+            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${processName}". Frontline ${role} performing: ${steps[0]?.instruction || processName}. Clear hand movements, standard workplace tools, photorealistic, clean industrial lighting.`
+          }]
+        };
+      } else {
+        const prep = steps[0];
+        const exec = steps[Math.floor(steps.length / 2)] || steps[1];
+        const verify = steps[steps.length - 1];
+        parsedData.video_demonstration_plan = {
+          strategy: "sequential_steps",
+          total_clips: 3,
+          clips: [
+            {
+              clip_index: 1,
+              step_ref: `Step 1: ${prep.task_title || "Prep"}`,
+              title: prep.task_title || "Preparation & Check",
+              duration_seconds: 8,
+              key_action: prep.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} in workplace setting. Step 1: ${prep.instruction}. Clear physical focus on tools and checklist, photorealistic, high definition.`
+            },
+            {
+              clip_index: 2,
+              step_ref: `Step 2: ${exec.task_title || "Execution"}`,
+              title: exec.task_title || "Core Operational Action",
+              duration_seconds: 8,
+              key_action: exec.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} executing: ${exec.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`
+            },
+            {
+              clip_index: 3,
+              step_ref: `Step 3: ${verify.task_title || "Verification"}`,
+              title: verify.task_title || "Final Control & Verification",
+              duration_seconds: 8,
+              key_action: verify.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting final inspection: ${verify.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`
+            }
+          ]
+        };
+      }
+    }
     console.log(`[Server /api/gemini/generate-blueprint SUCCESS] Extracted ${parsedData.operational_steps?.length || 0} high-fidelity steps from '${filename}'`);
     return res.json({
       success: true,
@@ -433,6 +550,153 @@ app.post("/api/coach", async (req, res) => {
     });
   }
 });
+app.post("/api/generate-video", async (req, res) => {
+  try {
+    const { prompt, aspectRatio = "16:9", resolution = "720p" } = req.body;
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({ success: false, error: "A prompt is required for video generation." });
+    }
+    const aiClient = getGeminiClient(req);
+    if (!aiClient) {
+      return res.status(500).json({ success: false, error: "Gemini API key is not configured." });
+    }
+    const operation = await aiClient.models.generateVideos({
+      model: "veo-3.1-lite-generate-preview",
+      prompt,
+      config: {
+        numberOfVideos: 1,
+        resolution: resolution === "1080p" ? "1080p" : "720p",
+        aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9"
+      }
+    });
+    console.log("[Veo] Video generation started:", operation.name);
+    return res.json({ success: true, operationName: operation.name });
+  } catch (error) {
+    console.error("[Veo Generate Error]", error);
+    return res.status(500).json({ success: false, error: error?.message || "Failed to start video generation." });
+  }
+});
+app.post("/api/video-status", async (req, res) => {
+  try {
+    const { operationName } = req.body;
+    if (!operationName) {
+      return res.status(400).json({ success: false, error: "operationName is required." });
+    }
+    const aiClient = getGeminiClient(req);
+    if (!aiClient) {
+      return res.status(500).json({ success: false, error: "Gemini API key is not configured." });
+    }
+    const op = new GenerateVideosOperation();
+    op.name = operationName;
+    const updated = await aiClient.operations.getVideosOperation({ operation: op });
+    return res.json({
+      success: true,
+      done: Boolean(updated.done),
+      error: updated.error || null
+    });
+  } catch (error) {
+    console.error("[Veo Status Error]", error);
+    return res.status(500).json({ success: false, error: error?.message || "Failed to check video status." });
+  }
+});
+app.post("/api/video-download", async (req, res) => {
+  try {
+    const { operationName, lessonId, clipIndex = 1 } = req.body;
+    if (!operationName) {
+      return res.status(400).json({ success: false, error: "operationName is required." });
+    }
+    const aiClient = getGeminiClient(req);
+    const apiKey = getApiKey(req);
+    if (!aiClient || !apiKey) {
+      return res.status(500).json({ success: false, error: "Gemini API key is not configured." });
+    }
+    const op = new GenerateVideosOperation();
+    op.name = operationName;
+    const updated = await aiClient.operations.getVideosOperation({ operation: op });
+    const downloadUri = updated.response?.generatedVideos?.[0]?.video?.uri;
+    if (!downloadUri) {
+      return res.status(404).json({ success: false, error: "Video URI not found in completed operation." });
+    }
+    const videoRes = await fetch(downloadUri, {
+      headers: { "x-goog-api-key": apiKey }
+    });
+    if (!videoRes.ok) {
+      return res.status(videoRes.status).json({ success: false, error: `Failed to fetch video file: ${videoRes.statusText}` });
+    }
+    const arrayBuffer = await videoRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (lessonId && typeof lessonId === "string") {
+      try {
+        const destPath = getSafeVideoPath(lessonId, Number(clipIndex) || 1);
+        await fs.promises.writeFile(destPath, buffer);
+        console.log(`[Server Storage] Saved video clip to server disk: ${destPath}`);
+      } catch (saveErr) {
+        console.warn("[Server Storage] Failed to write video to server disk:", saveErr);
+      }
+    }
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", buffer.length.toString());
+    return res.send(buffer);
+  } catch (error) {
+    console.error("[Veo Download Error]", error);
+    return res.status(500).json({ success: false, error: error?.message || "Failed to download video." });
+  }
+});
+app.get("/api/videos/stream/:lessonId/:clipIndex", (req, res) => {
+  try {
+    const { lessonId, clipIndex } = req.params;
+    const filePath = getSafeVideoPath(lessonId, Number(clipIndex) || 1);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: "Video not found on server storage." });
+    }
+    return res.sendFile(filePath, {
+      headers: {
+        "Content-Type": "video/mp4",
+        "Cache-Control": "public, max-age=86400"
+      }
+    });
+  } catch (error) {
+    console.error("[Video Stream Error]", error);
+    return res.status(500).json({ success: false, error: "Failed to stream video." });
+  }
+});
+app.get("/api/videos/check/:lessonId", (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const safeId = lessonId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const existingClips = [];
+    for (let i = 1; i <= 10; i++) {
+      const p = path.join(videosDir, `${safeId}_clip_${i}.mp4`);
+      if (fs.existsSync(p)) {
+        existingClips.push(i);
+      }
+    }
+    return res.json({
+      success: true,
+      clips: existingClips
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: "Failed to check video storage." });
+  }
+});
+app.delete("/api/videos/:lessonId", (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const safeId = lessonId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    for (let i = 1; i <= 10; i++) {
+      const p = path.join(videosDir, `${safeId}_clip_${i}.mp4`);
+      if (fs.existsSync(p)) {
+        try {
+          fs.unlinkSync(p);
+        } catch (_) {
+        }
+      }
+    }
+    return res.json({ success: true, message: "Server video storage cleared." });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: "Failed to delete videos." });
+  }
+});
 app.all("/api/*", (req, res) => {
   res.status(404).json({
     error: "API_ENDPOINT_NOT_FOUND",
@@ -440,9 +704,14 @@ app.all("/api/*", (req, res) => {
   });
 });
 const distPath = path.resolve(process.cwd(), "dist");
-if (process.env.NODE_ENV === "production") {
+const indexHtmlExists = fs.existsSync(path.join(distPath, "index.html"));
+const isProduction = process.env.NODE_ENV === "production" || indexHtmlExists && process.env.NODE_ENV !== "development";
+if (isProduction) {
   app.use(express.static(distPath));
-  app.get("*", (_req, res) => {
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ success: false, error: "API route not found" });
+    }
     res.sendFile(path.join(distPath, "index.html"));
   });
 } else {
