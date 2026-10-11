@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ArrowRight, BookOpen, Play, Bookmark, FileText, Compass, Award } from 'lucide-react';
+import { ChevronLeft, ArrowRight, BookOpen, Play, Bookmark, FileText, Compass, Award, Film, Sparkles } from 'lucide-react';
 import { Lesson } from '../types';
 import { sounds } from '../utils/audio';
 
@@ -8,6 +8,7 @@ interface LessonOverviewProps {
   onBack: () => void;
   onOpenIntroDeck: () => void;
   onStartSimulation: (phase: number) => void;
+  onOpenVideoDemo?: () => void;
   onAskTrainer?: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function LessonOverview({
   onBack,
   onOpenIntroDeck,
   onStartSimulation,
+  onOpenVideoDemo,
   onAskTrainer,
 }: LessonOverviewProps) {
   const [bookmarked, setBookmarked] = useState(false);
@@ -79,9 +81,9 @@ export default function LessonOverview({
 
   const learningPath = [
     {
-      id: 'know-it',
-      title: 'Know It',
-      modeTag: 'TEACHING FORMAT',
+      id: 'training-deck',
+      title: 'Training deck',
+      modeTag: 'TEACHING DECK',
       desc: 'Explain the SOP & process in simple presentation format',
       duration: '2 min',
       icon: BookOpen,
@@ -93,13 +95,13 @@ export default function LessonOverview({
     {
       id: 'show-me',
       title: 'Show Me',
-      modeTag: 'DEMONSTRATION',
-      desc: 'Watch Coach demonstrate the actual SOP steps',
-      duration: '3 min',
-      icon: Play,
-      action: () => onStartSimulation(0),
+      modeTag: 'AI VIDEO DEMO',
+      desc: 'Watch photorealistic AI video demonstration of the SOP steps',
+      duration: '1-3 min',
+      icon: Film,
+      action: () => onOpenVideoDemo ? onOpenVideoDemo() : onStartSimulation(0),
       illustration: (
-        <Play size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
+        <Film size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
       )
     },
     {

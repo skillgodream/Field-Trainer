@@ -35,6 +35,7 @@ import { ExtractedDocument } from './utils/documentExtractor';
 import { validateSourceFidelity } from './utils/sourceValidator';
 import { generateDomainNeutralLesson } from './utils/domainNeutralGenerator';
 import { getApiHeaders } from './utils/apiHelper';
+import { ShowMeVideoModal } from './components/ShowMeVideoModal';
 
 export default function App() {
   const [isDesignCheck, setIsDesignCheck] = useState<boolean>(
@@ -89,6 +90,7 @@ export default function App() {
 
   // Active Learning Mode States:
   const [isIntroDeckOpen, setIsIntroDeckOpen] = useState<boolean>(false);
+  const [isVideoDemoOpen, setIsVideoDemoOpen] = useState<boolean>(false);
   const [activeSimulator, setActiveSimulator] = useState<Lesson | null>(null);
   const [simulatorPhase, setSimulatorPhase] = useState<number>(1);
 
@@ -101,11 +103,11 @@ export default function App() {
 
   // Dynamic Background Management to completely eliminate any "white patch" / light background leakage on overscroll/elastic scroll
   React.useEffect(() => {
-    const isDarkTheme = (activeTab === 'home' && !selectedLesson && !activeSimulator && !isIntroDeckOpen) || isIntroDeckOpen || analyzingSop !== null || isProcessing;
+    const isDarkTheme = (activeTab === 'home' && !selectedLesson && !activeSimulator && !isIntroDeckOpen && !isVideoDemoOpen) || isIntroDeckOpen || isVideoDemoOpen || analyzingSop !== null || isProcessing;
     const targetColor = isDarkTheme ? '#070A14' : '#F7F7F5';
     document.body.style.backgroundColor = targetColor;
     document.documentElement.style.backgroundColor = targetColor;
-  }, [activeTab, selectedLesson, activeSimulator, isIntroDeckOpen, analyzingSop, isProcessing]);
+  }, [activeTab, selectedLesson, activeSimulator, isIntroDeckOpen, isVideoDemoOpen, analyzingSop, isProcessing]);
 
   /**
    * AUTHORITATIVE SOP PIPELINE HANDLER
@@ -521,7 +523,7 @@ export default function App() {
       )}
 
       {/* Ensure LessonOverview and following stages are visible */}
-      {selectedLesson && !activeSimulator && !isIntroDeckOpen && !isExperiencedCheckOpen && (
+      {selectedLesson && !activeSimulator && !isIntroDeckOpen && !isExperiencedCheckOpen && !isVideoDemoOpen && (
         <LessonOverview
           lesson={selectedLesson}
           onBack={() => {
@@ -530,6 +532,7 @@ export default function App() {
           }}
           onOpenIntroDeck={() => setIsIntroDeckOpen(true)}
           onStartSimulation={(phase) => handleStartSimulation(phase)}
+          onOpenVideoDemo={() => setIsVideoDemoOpen(true)}
           onAskTrainer={() => setIsTrainerModalOpen(true)}
         />
       )}
@@ -598,13 +601,26 @@ export default function App() {
       {/* STEP 3: 4 LEARNING MODES SCREEN (Know It, Show Me, Guide Me, Test Me) 
           Handled globally via selectedLesson state */}
       
-      {/* MODE 1: KNOW IT (Universal Teach Me Slide Deck) */}
+      {/* MODE 1: TRAINING DECK (Universal Teach Me Slide Deck) */}
       {isIntroDeckOpen && selectedLesson && (
         <ExperiencePlayer
           plan={planSlides(selectedLesson)}
           onClose={() => setIsIntroDeckOpen(false)}
           onComplete={() => {
             setIsIntroDeckOpen(false);
+            handleStartSimulation(1);
+          }}
+        />
+      )}
+
+      {/* MODE 2: SHOW ME (Google Veo On-Demand AI Video Demonstration) */}
+      {isVideoDemoOpen && selectedLesson && (
+        <ShowMeVideoModal
+          isOpen={isVideoDemoOpen}
+          lesson={selectedLesson}
+          onClose={() => setIsVideoDemoOpen(false)}
+          onContinueToGuideMe={() => {
+            setIsVideoDemoOpen(false);
             handleStartSimulation(1);
           }}
         />

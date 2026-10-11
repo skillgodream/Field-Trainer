@@ -118,7 +118,7 @@ export default function MicroLessonSheet({
             }}
             className="w-full h-12 rounded-full border border-[#E6E8EC] bg-white text-[#0E1116] font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 active:scale-98 transition-all"
           >
-            <BookOpen size={16} className="text-[#2F6FED]" /> Re-Open Know It (Basics Reference)
+            <BookOpen size={16} className="text-[#2F6FED]" /> Re-Open Training deck (Reference)
           </button>
 
           <button

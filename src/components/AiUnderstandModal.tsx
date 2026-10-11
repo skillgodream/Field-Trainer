@@ -159,7 +159,7 @@ export default function AiUnderstandModal({
               </div>
               <div>
                 <span className="text-xs font-bold block">3. 4-Stage Learning Experience</span>
-                <span className="text-[10px] font-semibold opacity-85 block">Know It · Show Me · Guide Me · Test Me</span>
+                <span className="text-[10px] font-semibold opacity-85 block">Training deck · Show Me · Guide Me · Test Me</span>
               </div>
             </div>
           </div>

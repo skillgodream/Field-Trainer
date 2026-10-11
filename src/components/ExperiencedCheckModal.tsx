@@ -131,7 +131,7 @@ export default function ExperiencedCheckModal({
               <div>
                 <h3 className="text-xl font-bold text-[#0E1116]">Review Recommended ({correctCount}/4)</h3>
                 <p className="text-xs text-[#3D4652] mt-1 font-semibold leading-relaxed">
-                  A quick walk through the presentation cards in <b>Know It</b> will refresh the exact procedure for this warehouse.
+                  A quick walk through the presentation cards in <b>Training deck</b> will refresh the exact procedure for this warehouse.
                 </p>
               </div>
 
@@ -143,7 +143,7 @@ export default function ExperiencedCheckModal({
                 }}
                 className="w-full h-14 rounded-full bg-[#0E1116] hover:bg-black text-white font-bold text-base flex items-center justify-center gap-2 active:scale-98 transition-all shadow-lg"
               >
-                Continue to Know It <ArrowRight size={18} />
+                Continue to Training deck <ArrowRight size={18} />
               </button>
             </div>
           )}

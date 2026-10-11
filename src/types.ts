@@ -143,6 +143,23 @@ export interface OperationalBlueprint {
 
   source_evidence: { id: string; page_or_section: string; excerpt: string }[];
   confidence: number;
+  video_demonstration_plan?: VideoDemonstrationPlan;
+}
+
+export interface VideoClipPlan {
+  clip_index: number;
+  step_ref?: string;
+  title: string;
+  duration_seconds: number;
+  veo_prompt: string;
+  key_action?: string;
+  tool_or_hazard?: string;
+}
+
+export interface VideoDemonstrationPlan {
+  strategy: 'single_continuous_15s' | 'sequential_steps';
+  total_clips: number;
+  clips: VideoClipPlan[];
 }
 
 export interface Lesson {
@@ -166,6 +183,7 @@ export interface Lesson {
   knowledgeModel?: SopKnowledgeModel;
   trainingPlan?: TrainingPlanItem[];
   stepObjects?: StepObject[];
+  videoPlan?: VideoDemonstrationPlan;
 }
 
 export interface ToolItem {

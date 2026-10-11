@@ -18,6 +18,7 @@ import {
   StepCategoryType,
   SopKnowledgeModel,
   TrainingPlanItem,
+  VideoDemonstrationPlan,
 } from '../types';
 
 const METADATA_PATTERNS = [
@@ -759,6 +760,65 @@ export function generateLessonFromOperationalBlueprint(
     artType = 'clipboard';
   }
 
+  const videoPlan: VideoDemonstrationPlan = (() => {
+    if (opBlueprint.video_demonstration_plan?.clips && opBlueprint.video_demonstration_plan.clips.length > 0) {
+      return opBlueprint.video_demonstration_plan;
+    }
+
+    const steps = opBlueprint.operational_steps || [];
+    if (steps.length <= 2) {
+      const mainAction = steps[0]?.instruction || opBlueprint.process;
+      return {
+        strategy: 'single_continuous_15s',
+        total_clips: 1,
+        clips: [
+          {
+            clip_index: 1,
+            title: `Full Procedure: ${opBlueprint.process.slice(0, 36)}`,
+            duration_seconds: 15,
+            key_action: mainAction,
+            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${opBlueprint.process}". Frontline ${opBlueprint.role || 'technician'} performing: ${mainAction}. Clear hand movements, standard workplace equipment, photorealistic, clean industrial lighting.`,
+          },
+        ],
+      };
+    }
+
+    const prepStep = steps[0];
+    const execStep = steps[Math.floor(steps.length / 2)] || steps[1];
+    const verifyStep = steps[steps.length - 1];
+
+    return {
+      strategy: 'sequential_steps',
+      total_clips: 3,
+      clips: [
+        {
+          clip_index: 1,
+          step_ref: `Step 1: ${prepStep.task_title || 'Preparation'}`,
+          title: prepStep.task_title || 'Preparation & Check',
+          duration_seconds: 8,
+          key_action: prepStep.instruction,
+          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} in workplace setting. Step 1: ${prepStep.instruction}. Clear physical focus on tools and checklist, photorealistic, high definition.`,
+        },
+        {
+          clip_index: 2,
+          step_ref: `Step 2: ${execStep.task_title || 'Execution'}`,
+          title: execStep.task_title || 'Core Operational Action',
+          duration_seconds: 8,
+          key_action: execStep.instruction,
+          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} executing: ${execStep.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`,
+        },
+        {
+          clip_index: 3,
+          step_ref: `Step 3: ${verifyStep.task_title || 'Verification'}`,
+          title: verifyStep.task_title || 'Final Control & Verification',
+          duration_seconds: 8,
+          key_action: verifyStep.instruction,
+          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} conducting final inspection: ${verifyStep.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`,
+        },
+      ],
+    };
+  })();
+
   const lesson: Lesson = {
     id: lessonId,
     title: process,
@@ -785,6 +845,7 @@ export function generateLessonFromOperationalBlueprint(
     blueprint,
     passport,
     operationalBlueprint: opBlueprint,
+    videoPlan,
   };
 
   return { lesson, passport, blueprint, stepObjects };

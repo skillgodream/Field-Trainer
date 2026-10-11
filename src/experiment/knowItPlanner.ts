@@ -307,7 +307,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
   /* 1. TOPIC */
   slides.push({
     type: 'WELCOME',
-    tag: 'Know It',
+    tag: 'Training deck',
     title: d.topic,
     role: d.role ? `Role: ${d.role}` : undefined,
     content: d.purpose || `Training based on ${(lesson as any).sourceMeta?.filename || 'your uploaded SOP'}.`,
@@ -528,7 +528,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
   slides.push({
     type: 'COMPLETION',
     title: 'Great Job!',
-    content: `You’ve completed the Know It overview for ${d.topic}.`,
+    content: `You’ve completed the Training deck overview for ${d.topic}.`,
     next: 'Next: Show Me',
     nb: 'See the steps in action, then practise them with a coach.',
   });

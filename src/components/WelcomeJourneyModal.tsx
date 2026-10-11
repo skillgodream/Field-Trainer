@@ -115,7 +115,7 @@ export default function WelcomeJourneyModal({
                   New to this SOP
                 </span>
                 <span className="text-xs font-medium text-slate-500 block mt-0.5">
-                  Start with Know It cards & tool explorer
+                  Start with Training deck cards & tool explorer
                 </span>
               </div>
             </div>
