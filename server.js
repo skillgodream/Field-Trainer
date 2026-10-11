@@ -551,18 +551,20 @@ app.post("/api/coach", async (req, res) => {
   }
 });
 app.post("/api/generate-video", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   try {
-    const { prompt, aspectRatio = "16:9", resolution = "720p" } = req.body;
+    const { prompt, aspectRatio = "16:9", resolution = "720p" } = req.body || {};
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({ success: false, error: "A prompt is required for video generation." });
     }
     const aiClient = getGeminiClient(req);
     if (!aiClient) {
-      return res.status(500).json({ success: false, error: "Gemini API key is not configured." });
+      return res.status(500).json({ success: false, error: "Gemini API key is not configured on server or in request headers." });
     }
+    const safePrompt = prompt.trim().slice(0, 2e3);
     const operation = await aiClient.models.generateVideos({
       model: "veo-3.1-lite-generate-preview",
-      prompt,
+      prompt: safePrompt,
       config: {
         numberOfVideos: 1,
         resolution: resolution === "1080p" ? "1080p" : "720p",
@@ -570,33 +572,40 @@ app.post("/api/generate-video", async (req, res) => {
       }
     });
     console.log("[Veo] Video generation started:", operation.name);
-    return res.json({ success: true, operationName: operation.name });
+    return res.status(200).json({ success: true, operationName: operation.name });
   } catch (error) {
     console.error("[Veo Generate Error]", error);
-    return res.status(500).json({ success: false, error: error?.message || "Failed to start video generation." });
+    const msg = error?.message || (typeof error === "string" ? error : "Failed to start video generation.");
+    return res.status(500).json({ success: false, error: msg });
   }
 });
 app.post("/api/video-status", async (req, res) => {
+  res.setHeader("Content-Type", "application/json");
   try {
-    const { operationName } = req.body;
+    const { operationName } = req.body || {};
     if (!operationName) {
       return res.status(400).json({ success: false, error: "operationName is required." });
     }
     const aiClient = getGeminiClient(req);
     if (!aiClient) {
-      return res.status(500).json({ success: false, error: "Gemini API key is not configured." });
+      return res.status(500).json({ success: false, error: "Gemini API key is not configured on server or in request headers." });
     }
     const op = new GenerateVideosOperation();
     op.name = operationName;
     const updated = await aiClient.operations.getVideosOperation({ operation: op });
-    return res.json({
+    let errObj = null;
+    if (updated.error) {
+      errObj = typeof updated.error === "string" ? updated.error : updated.error.message || JSON.stringify(updated.error);
+    }
+    return res.status(200).json({
       success: true,
       done: Boolean(updated.done),
-      error: updated.error || null
+      error: errObj
     });
   } catch (error) {
     console.error("[Veo Status Error]", error);
-    return res.status(500).json({ success: false, error: error?.message || "Failed to check video status." });
+    const msg = error?.message || (typeof error === "string" ? error : "Failed to check video status.");
+    return res.status(500).json({ success: false, error: msg });
   }
 });
 app.post("/api/video-download", async (req, res) => {

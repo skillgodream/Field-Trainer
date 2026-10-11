@@ -19,6 +19,7 @@ import {
   saveClipBlob, 
   removeAllLessonClips 
 } from '../utils/videoCache';
+import { getApiHeaders } from '../utils/apiHelper';
 
 interface ShowMeVideoModalProps {
   isOpen: boolean;
@@ -107,14 +108,21 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
 
       // 1. First check server storage (cross-device & permanent for all users)
       try {
-        const srvRes = await fetch(`/api/videos/check/${encodeURIComponent(lesson.id)}`);
+        const srvRes = await fetch(`/api/videos/check/${encodeURIComponent(lesson.id)}`, {
+          headers: getApiHeaders(),
+        });
         if (srvRes.ok) {
-          const srvData = await srvRes.json();
-          if (srvData.success && Array.isArray(srvData.clips) && srvData.clips.length > 0) {
-            srvData.clips.forEach((clipIdx: number) => {
-              urlsMap[clipIdx] = `/api/videos/stream/${encodeURIComponent(lesson.id)}/${clipIdx}`;
-              anyFound = true;
-            });
+          const text = await srvRes.text();
+          if (text) {
+            try {
+              const srvData = JSON.parse(text);
+              if (srvData.success && Array.isArray(srvData.clips) && srvData.clips.length > 0) {
+                srvData.clips.forEach((clipIdx: number) => {
+                  urlsMap[clipIdx] = `/api/videos/stream/${encodeURIComponent(lesson.id)}/${clipIdx}`;
+                  anyFound = true;
+                });
+              }
+            } catch (_) {}
           }
         }
       } catch (err) {
@@ -167,12 +175,46 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     }
   }, [activeClipIndex, modalState, cachedUrls]);
 
+  // Safe JSON fetch helper preventing 'Unexpected end of JSON input'
+  const safeFetchJson = async (url: string, options: RequestInit = {}): Promise<any> => {
+    const mergedHeaders = getApiHeaders({
+      'Content-Type': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    });
+
+    const res = await fetch(url, { ...options, headers: mergedHeaders });
+    const text = await res.text();
+
+    if (!text || !text.trim()) {
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status} (${res.statusText || 'empty response'}). Check API key and server connectivity.`);
+      }
+      return {};
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (!res.ok) {
+        throw new Error(`Server error (HTTP ${res.status}): ${text.slice(0, 150)}`);
+      }
+      throw new Error(`Invalid response format from server: ${text.slice(0, 150)}`);
+    }
+
+    if (!res.ok) {
+      const errorMsg = data.error || data.message || `Request failed with HTTP ${res.status}`;
+      throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+    }
+
+    return data;
+  };
+
   // Helper to run Veo generation for a single prompt
   const generateSingleClip = async (targetPrompt: string, clipIndex: number): Promise<Blob> => {
-    // 1. Post request
-    const startRes = await fetch('/api/generate-video', {
+    // 1. Post request safely with API headers
+    const startData = await safeFetchJson('/api/generate-video', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: targetPrompt.trim(),
         aspectRatio: '16:9',
@@ -180,26 +222,29 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
       }),
     });
 
-    const startData = await startRes.json();
-    if (!startRes.ok || !startData.success || !startData.operationName) {
+    if (!startData.success || !startData.operationName) {
       throw new Error(startData.error || `Failed to initiate generation for Step ${clipIndex}.`);
     }
 
     const operationName = startData.operationName;
 
-    // 2. Poll until done
+    // 2. Poll until done with retry tolerance for transient network glitches
     return new Promise<Blob>((resolve, reject) => {
+      let consecutivePollErrors = 0;
       const pollInterval = setInterval(async () => {
         try {
-          const statusRes = await fetch('/api/video-status', {
+          const statusData = await safeFetchJson('/api/video-status', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ operationName }),
           });
 
-          const statusData = await statusRes.json();
-          if (!statusRes.ok || !statusData.success) {
-            throw new Error(statusData.error || `Polling failed for Step ${clipIndex}.`);
+          consecutivePollErrors = 0; // reset on successful poll
+
+          if (statusData.error) {
+            const errDetail = typeof statusData.error === 'string'
+              ? statusData.error
+              : statusData.error.message || JSON.stringify(statusData.error);
+            throw new Error(`Generation error for Step ${clipIndex}: ${errDetail}`);
           }
 
           if (statusData.done) {
@@ -209,7 +254,7 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
             // 3. Download and save directly to server storage
             const downloadRes = await fetch('/api/video-download', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getApiHeaders({ 'Content-Type': 'application/json' }),
               body: JSON.stringify({ 
                 operationName,
                 lessonId: lesson.id,
@@ -218,17 +263,23 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
             });
 
             if (!downloadRes.ok) {
-              throw new Error(`Failed to download Step ${clipIndex} video.`);
+              const errText = await downloadRes.text().catch(() => '');
+              throw new Error(`Failed to download Step ${clipIndex} video: HTTP ${downloadRes.status} ${errText.slice(0, 100)}`);
             }
 
             const videoBlob = await downloadRes.blob();
             resolve(videoBlob);
           }
-        } catch (pollErr) {
-          clearInterval(pollInterval);
-          reject(pollErr);
+        } catch (pollErr: any) {
+          consecutivePollErrors++;
+          console.warn(`[Video Poll Warning ${consecutivePollErrors}/4]`, pollErr);
+          // Allow up to 3 transient network glitches before failing
+          if (consecutivePollErrors >= 4) {
+            clearInterval(pollInterval);
+            reject(pollErr);
+          }
         }
-      }, 5000);
+      }, 4000);
 
       pollTimerRef.current = pollInterval;
     });
@@ -308,7 +359,10 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     cleanupPolling();
     cleanupAllUrls();
     try {
-      await fetch(`/api/videos/${encodeURIComponent(lesson.id)}`, { method: 'DELETE' });
+      await fetch(`/api/videos/${encodeURIComponent(lesson.id)}`, { 
+        method: 'DELETE',
+        headers: getApiHeaders(),
+      });
     } catch (_) {}
     await removeAllLessonClips(lesson.id, totalClips);
     setCachedUrls({});
