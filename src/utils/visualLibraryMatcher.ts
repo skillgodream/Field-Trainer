@@ -12,7 +12,8 @@ const STOP_WORDS = new Set([
   'these', 'those', 'you', 'your', 'yours', 'from', 'it', 'its', 'about', 'above', 
   'after', 'again', 'against', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 
   'other', 'some', 'such', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 
-  'should', 'now', 'do', 'does', 'did', 'doing', 'how', 'what', 'why', 'where', 'when']);
+  'should', 'now', 'do', 'does', 'did', 'doing', 'how', 'what', 'why', 'where', 'when'
+]);
 
 /**
  * Micro-stemmer to normalize various word forms into base forms.
@@ -61,7 +62,7 @@ function tokenize(text: string): string[] {
     .map(stem);
 }
 
-// Lightweight pilot 25 assets array
+// Lightweight pilot 25 assets array defined inline
 const pilot25Assets: VisualAsset[] = [
   { id: 'pilot_kyc_verification', file: 'NFBC_SOP_Visual_Library_FINAL/pilot_25/kyc_verification.webp', tags: ['kyc', 'verification', 'identity', 'document'], category: 'pilot_25', source_generated: true },
   { id: 'pilot_loan_disbursement', file: 'NFBC_SOP_Visual_Library_FINAL/pilot_25/loan_disbursement.webp', tags: ['loan', 'disbursement', 'cash', 'transfer'], category: 'pilot_25', source_generated: true },
@@ -151,7 +152,7 @@ const additionalNfbcAssets: VisualAsset[] = [
   }
 ];
 
-// Combine all sources safely without missing JSON dependencies
+// Combine all sources safely without JSON dependencies
 const allAssets: VisualAsset[] = [
   ...pilot25Assets,
   ...additionalNfbcAssets

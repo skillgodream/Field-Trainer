@@ -399,14 +399,14 @@ export default function App() {
                           setIsSopOptionsOpen(false);
                           handleSelectSop('housekeeping_sanitization', 'Housekeeping: Room Sanitization');
                         }}
-                        className="col-span-2 relative overflow-hidden bg-gradient-to-r from-indigo-600/40 to-purple-600/40 hover:from-indigo-600/60 hover:to-purple-600/60 border border-indigo-500/30 rounded-2xl p-4 transition-all flex items-center justify-between group cursor-pointer text-left shadow-lg"
+                        className="col-span-2 relative overflow-hidden bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 rounded-2xl p-4 transition-all flex items-center justify-between group cursor-pointer text-left shadow-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white text-lg shadow-inner group-hover:scale-105 transition-transform">
+                          <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white text-lg shadow-inner group-hover:scale-105 transition-transform">
                             🧹
                           </div>
                           <div>
-                            <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider block">
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
                               Demo
                             </span>
                             <span className="text-sm font-bold text-white block leading-tight">
@@ -414,7 +414,7 @@ export default function App() {
                             </span>
                           </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-indigo-300 group-hover:translate-x-1 transition-transform" />
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
                       </button>
 
                       {/* Option 2: Scan SOP */}
@@ -424,13 +424,13 @@ export default function App() {
                           setIsSopOptionsOpen(false);
                           setIsScanOpen(true);
                         }}
-                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-sky-500/30 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
+                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-inner group-hover:scale-105 transition-transform">
+                        <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
                           <Camera className="w-4 h-4" />
                         </div>
                         <div className="mt-2">
-                          <span className="text-[10px] font-semibold text-sky-400 block uppercase tracking-wider">
+                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
                             Camera
                           </span>
                           <span className="text-sm font-bold text-white block leading-tight">
@@ -446,13 +446,13 @@ export default function App() {
                           setIsSopOptionsOpen(false);
                           setIsUploadOpen(true);
                         }}
-                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-purple-500/30 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
+                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shadow-inner group-hover:scale-105 transition-transform">
+                        <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
                           <Upload className="w-4 h-4" />
                         </div>
                         <div className="mt-2">
-                          <span className="text-[10px] font-semibold text-purple-400 block uppercase tracking-wider">
+                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
                             Document
                           </span>
                           <span className="text-sm font-bold text-white block leading-tight">
@@ -470,7 +470,7 @@ export default function App() {
                         }}
                         className="col-span-2 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer mt-1"
                       >
-                        <BookOpen className="w-4 h-4 text-indigo-400" />
+                        <BookOpen className="w-4 h-4 text-slate-300" />
                         <span>Browse Library →</span>
                       </button>
                     </div>
