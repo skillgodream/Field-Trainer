@@ -1,7 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
 
-function getApiKey(): string | undefined {
+function getApiKey(req?: any): string | undefined {
+  const headerKey = req ? (
+    (typeof req.headers?.['x-gemini-api-key'] === 'string' ? req.headers['x-gemini-api-key'] : '') ||
+    (typeof req.headers?.['authorization'] === 'string' ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : '')
+  ).trim() : '';
+
   const rawKey = (
+    headerKey ||
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GEMINI_KEY ||
@@ -17,7 +23,7 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const apiKey = getApiKey();
+  const apiKey = getApiKey(req);
   if (!apiKey) {
     console.error('[API Error] GEMINI_API_KEY is not defined in deployment environment variables.');
     return res.status(500).json({ error: 'Server configuration error: Missing API Key' });

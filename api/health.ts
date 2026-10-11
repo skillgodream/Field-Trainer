@@ -1,5 +1,11 @@
-function getApiKey(): string | undefined {
+function getApiKey(req?: any): string | undefined {
+  const headerKey = req ? (
+    (typeof req.headers?.['x-gemini-api-key'] === 'string' ? req.headers['x-gemini-api-key'] : '') ||
+    (typeof req.headers?.['authorization'] === 'string' ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : '')
+  ).trim() : '';
+
   const rawKey = (
+    headerKey ||
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GEMINI_KEY ||
@@ -10,8 +16,8 @@ function getApiKey(): string | undefined {
   return rawKey.replace(/^["']|["']$/g, '').trim() || undefined;
 }
 
-export default async function handler(_req: any, res: any) {
-  const key = getApiKey();
+export default async function handler(req: any, res: any) {
+  const key = getApiKey(req);
   res.status(200).json({
     status: 'ok',
     hasGeminiKey: Boolean(key && key.length > 5),
