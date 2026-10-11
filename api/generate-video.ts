@@ -54,21 +54,69 @@ export default async function handler(req: any, res: any) {
 
     const safePrompt = prompt.trim().slice(0, 2000);
 
-    const operation = await ai.models.generateVideos({
-      model: 'veo-3.1-lite-generate-preview',
-      prompt: safePrompt,
-      config: {
-        numberOfVideos: 1,
-        resolution: resolution === '1080p' ? '1080p' : '720p',
-        aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9',
-      },
-    });
+    const VEO_MODELS = ['veo-3.1-fast-generate-preview', 'veo-3.1-lite-generate-preview'];
+    let operation: any = null;
+    let lastError: any = null;
 
-    console.log('[Serverless Veo] Video generation started:', operation.name);
+    // Multi-lane routing with exponential backoff & jitter
+    for (let attempt = 0; attempt < 2 && !operation; attempt++) {
+      for (const modelName of VEO_MODELS) {
+        try {
+          console.log(`[Serverless Veo] Attempting video generation on model: ${modelName} (attempt ${attempt + 1})`);
+          operation = await ai.models.generateVideos({
+            model: modelName,
+            prompt: safePrompt,
+            config: {
+              numberOfVideos: 1,
+              resolution: resolution === '1080p' ? '1080p' : '720p',
+              aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9',
+            },
+          });
+          if (operation?.name) {
+            console.log(`[Serverless Veo SUCCESS] Video generation started on ${modelName}:`, operation.name);
+            break;
+          }
+        } catch (laneErr: any) {
+          lastError = laneErr;
+          const is429 = laneErr?.status === 429 || laneErr?.message?.includes('429') || laneErr?.message?.includes('RESOURCE_EXHAUSTED');
+          console.warn(`[Serverless Veo Lane Warning] ${modelName} returned ${is429 ? '429 Rate Limit' : laneErr?.message?.slice(0, 60)}.`);
+          // Backoff jitter delay before attempting alternate lane
+          const backoffMs = (attempt + 1) * 2000 + Math.floor(Math.random() * 1500);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
+      }
+    }
+
+    if (!operation?.name) {
+      throw lastError || new Error('Video generation failed on all available Veo model lanes.');
+    }
+
     return res.status(200).json({ success: true, operationName: operation.name });
   } catch (error: any) {
     console.error('[Serverless Veo Generate Error]', error);
-    const msg = error?.message || (typeof error === 'string' ? error : 'Failed to start video generation.');
+    let msg = error?.message || (typeof error === 'string' ? error : 'Failed to start video generation.');
+    try {
+      if (typeof msg === 'string' && msg.startsWith('{')) {
+        const parsed = JSON.parse(msg);
+        if (parsed.error?.message) msg = parsed.error.message;
+      }
+    } catch (_) {}
+
+    const isQuota =
+      msg.includes('429') ||
+      msg.includes('quota') ||
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      error?.status === 429 ||
+      error?.code === 429;
+
+    if (isQuota) {
+      return res.status(429).json({
+        success: false,
+        isQuotaExceeded: true,
+        error: 'Google Veo rate limit or daily quota reached (RESOURCE_EXHAUSTED). Video generation allows 1 request per minute on preview tiers. Please wait about 60 seconds and try again.',
+      });
+    }
+
     return res.status(500).json({ success: false, error: msg });
   }
 }

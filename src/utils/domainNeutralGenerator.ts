@@ -20,6 +20,7 @@ import {
   TrainingPlanItem,
   VideoDemonstrationPlan,
 } from '../types';
+import { buildVeoPrompt } from './veoPromptBuilder';
 
 const METADATA_PATTERNS = [
   /^standard operating procedure/i,
@@ -787,26 +788,34 @@ export function generateLessonFromOperationalBlueprint(
     }
 
     const steps = opBlueprint.operational_steps || [];
+    const role = opBlueprint.role || 'frontline professional';
+    const processName = opBlueprint.process;
+
     if (steps.length <= 2) {
-      const mainAction = steps[0]?.instruction || opBlueprint.process;
+      const mainAction = steps[0]?.instruction || processName;
       return {
         strategy: 'single_continuous_15s',
         total_clips: 1,
         clips: [
           {
             clip_index: 1,
-            title: `Full Procedure: ${opBlueprint.process.slice(0, 36)}`,
+            title: `Full Procedure: ${processName.slice(0, 36)}`,
             duration_seconds: 15,
             key_action: mainAction,
-            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${opBlueprint.process}". Frontline ${opBlueprint.role || 'technician'} performing: ${mainAction}. Clear hand movements, standard workplace equipment, photorealistic, clean industrial lighting.`,
+            veo_prompt: buildVeoPrompt({
+              role,
+              process: processName,
+              actionInstruction: mainAction,
+              stepIndex: 1,
+            }),
           },
         ],
       };
     }
 
-    const prepStep = steps[0];
-    const execStep = steps[Math.floor(steps.length / 2)] || steps[1];
-    const verifyStep = steps[steps.length - 1];
+    const prepStep = steps[0] || { instruction: 'Prepare workspace and confirm checklist', task_title: 'Preparation & Check' };
+    const execStep = steps[Math.floor(steps.length / 2)] || steps[1] || { instruction: 'Execute core operational step', task_title: 'Core Operational Action' };
+    const verifyStep = steps[steps.length - 1] || { instruction: 'Verify final state and record completion status', task_title: 'Verification & Handoff' };
 
     return {
       strategy: 'sequential_steps',
@@ -818,7 +827,13 @@ export function generateLessonFromOperationalBlueprint(
           title: prepStep.task_title || 'Preparation & Check',
           duration_seconds: 8,
           key_action: prepStep.instruction,
-          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} in workplace setting. Step 1: ${prepStep.instruction}. Clear physical focus on tools and checklist, photorealistic, high definition.`,
+          veo_prompt: buildVeoPrompt({
+            role,
+            process: processName,
+            taskTitle: prepStep.task_title,
+            actionInstruction: prepStep.instruction,
+            stepIndex: 1,
+          }),
         },
         {
           clip_index: 2,
@@ -826,7 +841,13 @@ export function generateLessonFromOperationalBlueprint(
           title: execStep.task_title || 'Core Operational Action',
           duration_seconds: 8,
           key_action: execStep.instruction,
-          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} executing: ${execStep.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`,
+          veo_prompt: buildVeoPrompt({
+            role,
+            process: processName,
+            taskTitle: execStep.task_title,
+            actionInstruction: execStep.instruction,
+            stepIndex: 2,
+          }),
         },
         {
           clip_index: 3,
@@ -834,7 +855,13 @@ export function generateLessonFromOperationalBlueprint(
           title: verifyStep.task_title || 'Final Control & Verification',
           duration_seconds: 8,
           key_action: verifyStep.instruction,
-          veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${opBlueprint.role || 'technician'} conducting final inspection: ${verifyStep.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`,
+          veo_prompt: buildVeoPrompt({
+            role,
+            process: processName,
+            taskTitle: verifyStep.task_title,
+            actionInstruction: verifyStep.instruction,
+            stepIndex: 3,
+          }),
         },
       ],
     };

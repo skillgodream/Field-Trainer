@@ -266,10 +266,17 @@ CRITICAL ARCHITECTURAL RULES:
    - hint: Specific reference to the SOP document section, visual cues, or indicators.
    - target_code: Authentic code extracted from or reflecting the SOP (e.g., LOC-A02-04, SKU-88421, FORM-Q7).
    - icon_key: Assign a domain-appropriate, clean Lucide vector icon key for each operational step, tool, and safety rule (e.g., ShieldAlert, ScanBarcode, Thermometer, Microscope, Boxes, FileCheck, Droplets, Sparkles, SprayCan, Syringe, ClipboardCheck, Users, CheckCircle, AlertTriangle, Zap, Scale, Truck, Lock, Settings). Match the icon meaningfully to the operational step \u2014 no arbitrary overfitting or underfitting.
-4. METADATA VS OPERATIONAL CONTENT:
+5. METADATA VS OPERATIONAL CONTENT:
    - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories, ISO reference codes.
    - OPERATIONAL CONTENT (MUST DRIVE BLUEPRINT): Physical actions, system entries, verbal communications, verifications, decision points, exception handling, escalations.
-5. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
+6. AI VIDEO DIRECTOR RULES FOR VEO 3.2 LITE:
+   For every clip in video_demonstration_plan.clips, formulate the "veo_prompt" as a dense 65-85 word single cinematic sentence following:
+   [Visual Style] + [Detailed Subject with Active Continuous Movement] + [Enriched Background Environment] + [Studio Lighting/Mood] + [Continuous Camera Tracking]
+   - BACKGROUND ENRICHMENT: Always build a detailed, authentic physical workspace (e.g. sleek executive conference suite with frosted acoustic glass partitions, sterile clinical preparation bench with specimen centrifuge racks, modern retail checkout counter, organized staging aisle). Never leave the background blank or abstract.
+   - PACING & CONTINUOUS MOVEMENT: Use active progressive verbs (e.g., "steadily reviewing and logging", "methodically cross-verifying", "carefully inspecting with deliberate hand movements"). Actions must be continuous, steady-state, or looping to prevent abrupt cutoffs at the 8-second mark.
+   - BAN COMPLETION VERBS: Do not use verbs indicating an end state (e.g., 'closes the laptop', 'presses the button', 'sits down'). Instead mandate continuous progressive action states (e.g., 'the laptop remains open as data flows', 'finger holding down the button safely', 'seated stationary while analyzing').
+   - CAMERA WORK: End every prompt with fluid continuous camera motion (e.g., "slow cinematic lateral tracking shot gently drifting leftward", "subtle continuous forward camera drift maintaining steady focal depth").
+7. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
     const textPrompt = `Uploaded SOP Document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
 ${docText ? `Document Text:
 """
@@ -285,8 +292,8 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
     "version": "Extracted version or empty",
     "department": "Extracted department or operations division"
   },
-  "role": "Exact worker role described in SOP (e.g., Quick Commerce Picker, Phlebotomy Technician, Retail Cashier)",
-  "process": "Exact core operational process (e.g., Order Picking & Cold Chain Packing, Blood Sample Collection)",
+  "role": "Exact worker role described in SOP (e.g., Compliance Officer, Operations Associate, Retail Cashier, Technician)",
+  "process": "Exact core operational process (e.g., Incident Intake & Logging, Order Fulfillment, Blood Sample Collection)",
   "purpose": "1-2 sentence primary operational goal for the worker",
   "scope": "Applicable department or workspace boundaries",
   "prerequisites": [
@@ -370,11 +377,11 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
     "clips": [
       {
         "clip_index": 1,
-        "step_ref": "Step 1: Pre-inspection",
-        "title": "Safety Lockout & Gear Check",
+        "step_ref": "Step 1: Receipt & Intake",
+        "title": "Immediate Response & Intake",
         "duration_seconds": 8,
         "key_action": "Specific physical action from SOP",
-        "veo_prompt": "Cinematic 720p 16:9 instructional video shot: Frontline worker executing precise action with equipment in workplace."
+        "veo_prompt": "Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline specialist is methodically reviewing and cross-verifying intake documentation with continuous, deliberate hand movements. Setting is an executive private meeting suite with frosted acoustic glass partitions and polished oak conference desk. Soft natural morning daylight balanced by warm commercial recessed lighting. Slow cinematic lateral camera tracking shot gently drifting forward."
       }
     ]
   },
@@ -426,7 +433,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
             title: `Full Procedure: ${processName.slice(0, 36)}`,
             duration_seconds: 15,
             key_action: steps[0]?.instruction || processName,
-            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${processName}". Frontline ${role} performing: ${steps[0]?.instruction || processName}. Clear hand movements, standard workplace tools, photorealistic, clean industrial lighting.`
+            veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is continuously demonstrating ${processName} with steady, methodical movements. The setting is an authentic, well-organized professional workspace with standard equipment. Soft natural daylight balanced by warm commercial recessed lighting. Smooth continuous lateral camera tracking shot gently drifting forward.`
           }]
         };
       } else {
@@ -443,7 +450,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: prep.task_title || "Preparation & Check",
               duration_seconds: 8,
               key_action: prep.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} in workplace setting. Step 1: ${prep.instruction}. Clear physical focus on tools and checklist, photorealistic, high definition.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is methodically preparing and cross-checking: ${prep.instruction}, with deliberate continuous hand movements. Setting is an authentic professional workplace station with organized tools and documentation. Clean balanced commercial illumination. Slow cinematic lateral tracking shot drifting smoothly across the workstation.`
             },
             {
               clip_index: 2,
@@ -451,7 +458,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: exec.task_title || "Core Operational Action",
               duration_seconds: 8,
               key_action: exec.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} executing: ${exec.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is steadily executing: ${exec.instruction}, with steady, continuous manipulation of standard equipment. Setting is an organized operational environment. Soft balanced overhead lighting. Steady forward camera drift maintaining continuous focal depth.`
             },
             {
               clip_index: 3,
@@ -459,7 +466,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: verify.task_title || "Final Control & Verification",
               duration_seconds: 8,
               key_action: verify.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting final inspection: ${verify.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is carefully reviewing and verifying final completion: ${verify.instruction}, with continuous hand motions. Setting is a clean, compliant operational checkout bench. Warm natural fill lighting. Slow cinematic right-to-left tracking dolly shot maintaining continuous focus until the final frame.`
             }
           ]
         };
@@ -562,20 +569,57 @@ app.post("/api/generate-video", async (req, res) => {
       return res.status(500).json({ success: false, error: "Gemini API key is not configured on server or in request headers." });
     }
     const safePrompt = prompt.trim().slice(0, 2e3);
-    const operation = await aiClient.models.generateVideos({
-      model: "veo-3.1-lite-generate-preview",
-      prompt: safePrompt,
-      config: {
-        numberOfVideos: 1,
-        resolution: resolution === "1080p" ? "1080p" : "720p",
-        aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9"
+    const VEO_MODELS = ["veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview"];
+    let operation = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 2 && !operation; attempt++) {
+      for (const modelName of VEO_MODELS) {
+        try {
+          console.log(`[Veo] Attempting video generation on model: ${modelName} (attempt ${attempt + 1})`);
+          operation = await aiClient.models.generateVideos({
+            model: modelName,
+            prompt: safePrompt,
+            config: {
+              numberOfVideos: 1,
+              resolution: resolution === "1080p" ? "1080p" : "720p",
+              aspectRatio: aspectRatio === "9:16" ? "9:16" : "16:9"
+            }
+          });
+          if (operation?.name) {
+            console.log(`[Veo SUCCESS] Video generation initiated on ${modelName}:`, operation.name);
+            break;
+          }
+        } catch (laneErr) {
+          lastError = laneErr;
+          const is429 = laneErr?.status === 429 || laneErr?.message?.includes("429") || laneErr?.message?.includes("RESOURCE_EXHAUSTED");
+          console.warn(`[Veo Lane Warning] ${modelName} returned ${is429 ? "429 Rate Limit" : laneErr?.message?.slice(0, 60)}.`);
+          const backoffMs = (attempt + 1) * 2e3 + Math.floor(Math.random() * 1500);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        }
       }
-    });
-    console.log("[Veo] Video generation started:", operation.name);
+    }
+    if (!operation?.name) {
+      throw lastError || new Error("Video generation failed on all available Veo model lanes.");
+    }
     return res.status(200).json({ success: true, operationName: operation.name });
   } catch (error) {
     console.error("[Veo Generate Error]", error);
-    const msg = error?.message || (typeof error === "string" ? error : "Failed to start video generation.");
+    let msg = error?.message || (typeof error === "string" ? error : "Failed to start video generation.");
+    try {
+      if (typeof msg === "string" && msg.startsWith("{")) {
+        const parsed = JSON.parse(msg);
+        if (parsed.error?.message) msg = parsed.error.message;
+      }
+    } catch (_) {
+    }
+    const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || error?.status === 429 || error?.code === 429;
+    if (isQuota) {
+      return res.status(429).json({
+        success: false,
+        isQuotaExceeded: true,
+        error: "Google Veo rate limit or daily quota reached (RESOURCE_EXHAUSTED). Video generation allows 1 request per minute on preview tiers. Please wait about 60 seconds and try again."
+      });
+    }
     return res.status(500).json({ success: false, error: msg });
   }
 });

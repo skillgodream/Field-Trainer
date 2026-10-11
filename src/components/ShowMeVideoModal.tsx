@@ -20,6 +20,7 @@ import {
   removeAllLessonClips 
 } from '../utils/videoCache';
 import { getApiHeaders } from '../utils/apiHelper';
+import { buildVeoPrompt } from '../utils/veoPromptBuilder';
 
 interface ShowMeVideoModalProps {
   isOpen: boolean;
@@ -51,11 +52,16 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     if (videoPlan?.clips?.[0]?.veo_prompt) {
       return videoPlan.clips[0].veo_prompt;
     }
-    const stepsSummary = lesson.stepObjects && lesson.stepObjects.length > 0
-      ? lesson.stepObjects.slice(0, 4).map(s => s.title).join(', ')
-      : lesson.subtitle || 'standard operational workflow';
+    const mainAction = lesson.stepObjects && lesson.stepObjects.length > 0
+      ? lesson.stepObjects[0].title
+      : lesson.title;
 
-    return `Cinematic photorealistic instructional video demonstration of "${lesson.title}". Showing a frontline worker executing the procedure: ${stepsSummary}. Clear hand movements, standard warehouse equipment handling, high definition, clean industrial lighting, 16:9 aspect ratio.`;
+    return buildVeoPrompt({
+      role: lesson.operationalBlueprint?.role || 'frontline professional',
+      process: lesson.title,
+      actionInstruction: mainAction,
+      stepIndex: 1,
+    });
   };
 
   const [promptText, setPromptText] = useState(buildDefaultPrompt());
@@ -203,8 +209,28 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     }
 
     if (!res.ok) {
-      const errorMsg = data.error || data.message || `Request failed with HTTP ${res.status}`;
-      throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      let rawError: any = data.error || data.message || `Request failed with HTTP ${res.status}`;
+      if (typeof rawError === 'object') {
+        rawError = rawError.message || rawError.details || JSON.stringify(rawError);
+      }
+      try {
+        if (typeof rawError === 'string' && rawError.startsWith('{')) {
+          const parsedInner = JSON.parse(rawError);
+          if (parsedInner.error?.message) rawError = parsedInner.error.message;
+        }
+      } catch (_) {}
+
+      const errString = String(rawError);
+      if (
+        res.status === 429 ||
+        errString.includes('429') ||
+        errString.includes('quota') ||
+        errString.includes('RESOURCE_EXHAUSTED')
+      ) {
+        throw new Error('Google Veo rate limit or daily quota reached (RESOURCE_EXHAUSTED). Video generation allows 1 request per minute on preview tiers. Please wait about 60 seconds and try again.');
+      }
+
+      throw new Error(errString);
     }
 
     return data;
@@ -615,17 +641,26 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
 
           {/* VIEW 4: ERROR */}
           {modalState === 'error' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3">
-              <div className="text-sm font-semibold text-white">Generation Failed</div>
-              <p className="text-xs text-zinc-400 max-w-sm">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3.5 animate-in fade-in duration-200">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-1 shadow-inner">
+                <Clock size={22} />
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {errorMessage?.includes('rate limit') || errorMessage?.includes('quota') || errorMessage?.includes('RESOURCE_EXHAUSTED')
+                  ? 'Veo Rate Limit Reached'
+                  : 'Generation Failed'}
+              </div>
+              <p className="text-xs text-zinc-400 max-w-md leading-relaxed px-4">
                 {errorMessage || 'Unable to complete video generation.'}
               </p>
-              <button
-                onClick={() => setModalState('prompt')}
-                className="text-xs bg-white/10 hover:bg-white/15 text-white px-4 py-2 rounded-lg transition-colors mt-2"
-              >
-                Try Again
-              </button>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={() => setModalState('prompt')}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95"
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           )}
 

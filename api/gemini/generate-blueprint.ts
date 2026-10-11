@@ -118,7 +118,14 @@ CRITICAL ARCHITECTURAL RULES:
 5. METADATA VS OPERATIONAL CONTENT:
    - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories, ISO reference codes.
    - OPERATIONAL CONTENT (MUST DRIVE BLUEPRINT): Physical actions, system entries, verbal communications, verifications, decision points, exception handling, escalations.
-6. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
+6. AI VIDEO DIRECTOR RULES FOR VEO 3.2 LITE:
+   For every clip in video_demonstration_plan.clips, formulate the "veo_prompt" as a dense 65-85 word single cinematic sentence following:
+   [Visual Style] + [Detailed Subject with Active Continuous Movement] + [Enriched Background Environment] + [Studio Lighting/Mood] + [Continuous Camera Tracking]
+   - BACKGROUND ENRICHMENT: Always build a detailed, authentic physical workspace (e.g. sleek executive conference suite with frosted acoustic glass partitions, sterile clinical preparation bench with specimen centrifuge racks, modern retail checkout counter, organized staging aisle). Never leave the background blank or abstract.
+   - PACING & CONTINUOUS MOVEMENT: Use active progressive verbs (e.g., "steadily reviewing and logging", "methodically cross-verifying", "carefully inspecting with deliberate hand movements"). Actions must be continuous, steady-state, or looping to prevent abrupt cutoffs at the 8-second mark.
+   - BAN COMPLETION VERBS: Do not use verbs indicating an end state (e.g., 'closes the laptop', 'presses the button', 'sits down'). Instead mandate continuous progressive action states (e.g., 'the laptop remains open as data flows', 'finger holding down the button safely', 'seated stationary while analyzing').
+   - CAMERA WORK: End every prompt with fluid continuous camera motion (e.g., "slow cinematic lateral tracking shot gently drifting leftward", "subtle continuous forward camera drift maintaining steady focal depth").
+7. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
 
     const textPrompt = `Uploaded SOP Document: "${filename || 'Operational Procedure'}" (${pageCount || 1} pages, ${wordCount || 100} words)
 ${docText ? `Document Text:\n"""\n${docText}\n"""\n` : ''}
@@ -292,7 +299,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
             title: `Full Procedure: ${processName.slice(0, 36)}`,
             duration_seconds: 15,
             key_action: steps[0]?.instruction || processName,
-            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${processName}". Frontline ${role} performing: ${steps[0]?.instruction || processName}. Clear hand movements, standard workplace tools, photorealistic, clean industrial lighting.`
+            veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is continuously demonstrating ${processName} with steady, methodical movements. The setting is an authentic, well-organized professional workspace with standard equipment. Soft natural daylight balanced by warm commercial recessed lighting. Smooth continuous lateral camera tracking shot gently drifting forward.`
           }]
         };
       } else {
@@ -310,7 +317,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: pre.task_title || 'Intake & Preparation',
               duration_seconds: 8,
               key_action: pre.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting initial step: ${pre.instruction}. Natural workplace environment, clear movements, compliant technique, photorealistic.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is methodically preparing and cross-checking: ${pre.instruction}, with deliberate continuous hand movements. Setting is an authentic professional workplace station with organized tools and documentation. Clean balanced commercial illumination. Slow cinematic lateral tracking shot drifting smoothly across the workstation.`
             },
             {
               clip_index: 2,
@@ -318,7 +325,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: exec.task_title || 'Core Operational Action',
               duration_seconds: 8,
               key_action: exec.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} executing: ${exec.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is steadily executing: ${exec.instruction}, with steady, continuous manipulation of standard equipment. Setting is an organized operational environment. Soft balanced overhead lighting. Steady forward camera drift maintaining continuous focal depth.`
             },
             {
               clip_index: 3,
@@ -326,7 +333,7 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
               title: verify.task_title || 'Final Control & Verification',
               duration_seconds: 8,
               key_action: verify.instruction,
-              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting final inspection: ${verify.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`
+              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is carefully reviewing and verifying final completion: ${verify.instruction}, with continuous hand motions. Setting is a clean, compliant operational checkout bench. Warm natural fill lighting. Slow cinematic right-to-left tracking dolly shot maintaining continuous focus until the final frame.`
             }
           ]
         };
