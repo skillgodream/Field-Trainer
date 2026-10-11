@@ -1,36 +1,9 @@
-/**
- * Know It — training deck planner (rewrite)
- *
- * Builds the Know It deck ONLY from what was extracted from the uploaded SOP.
- * No hardcoded warehouse / housekeeping / lab content, no generic filler slides,
- * no stock-photo override. If a section has no real content, its slide is skipped.
- *
- * Deck flow:
- *   1. Topic              (WELCOME)
- *   2. Objective          (OBJECTIVES)
- *   3. What has changed   (TEACH_STEP)        – only if the SOP text signals changes
- *   4. Before you start   (SECTION_INTRO)     – prerequisites + tools, if present
- *   5. The process        (SECTION_INTRO)     – overview of all steps
- *   6. Process steps      (TEACH_STEP × n)
- *   7. Decision points    (TEACH_STEP)
- *   8. Critical rules     (IMPORTANT_RULE × up to 3)
- *   9. Do / Don't         (DO_DONT)           – from common mistakes
- *  10. Exceptions         (TEACH_STEP)
- *  11. Escalation         (TEACH_STEP)
- *  12. Check yourself     (REAL_WORLD_SCENARIO + DECISION, up to 2) – AI-written scenarios only
- *  13. Key takeaways      (KEY_TAKEAWAYS)
- *  14. Completion         (COMPLETION)
- *
- * Only uses slide types and fields that already exist in src/experiment/types.ts,
- * so Renderer.tsx and ExperiencePlayer.tsx need no changes.
- */
-
 import { Lesson } from '../types';
 import { TeachMePlan, Slide } from './types';
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ * Helpers                                                            *
+ * ------------------------------------------------------------------ */
 
 const STOP_WORDS = new Set([
   'and', 'or', 'to', 'with', 'for', 'of', 'in', 'on', 'at', 'by', 'a', 'an', 'the',
@@ -102,9 +75,9 @@ function detectChanges(rawText: string): string[] {
   return uniq(lines.map((l) => clip(l, 170))).slice(0, 4);
 }
 
-/* ------------------------------------------------------------------ */
-/* Normalised content model                                            */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ * Normalised content model                                           *
+ * ------------------------------------------------------------------ */
 
 interface KStep {
   title: string;
@@ -177,6 +150,7 @@ function collect(lessonIn: Lesson): KData {
       .map((p: any) => clip(p?.text, 110))
       .filter((t: string) => t && !FILLER_PREREQ.test(t))
   );
+
   const toolsRaw: any[] = op?.tools_and_systems?.length ? op.tools_and_systems : pp?.tools || [];
   const tools = uniq(
     toolsRaw
@@ -188,6 +162,7 @@ function collect(lessonIn: Lesson): KData {
   let controls: KData['controls'] = (op?.critical_controls || [])
     .filter((c: any) => c?.rule)
     .map((c: any) => ({ rule: c.rule, why: FILLER_WHY.test(c.rationale || '') ? undefined : c.rationale }));
+
   if (!controls.length && pp?.golden_rules?.length) {
     controls = pp.golden_rules.filter((g: any) => g?.text).map((g: any) => ({ rule: g.text }));
   }
@@ -195,7 +170,7 @@ function collect(lessonIn: Lesson): KData {
     controls = op.safety_rules.filter((s: any) => s?.rule).map((s: any) => ({ rule: s.rule }));
   }
   if (!controls.length) {
-    controls = steps.filter((s) => s.critical).slice(0, 3).map((s) => ({ rule: s.text, why: s.why }));
+    controls = steps.filter((s) => s.critical).map((s) => ({ rule: s.text, why: s.why }));
   }
 
   // ---- mistakes
@@ -232,9 +207,9 @@ function collect(lessonIn: Lesson): KData {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Slide builders                                                      */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ * Slide builders                                                     *
+ * ------------------------------------------------------------------ */
 
 function usefulWhy(why: string | undefined, text: string): string | null {
   if (!why) return null;
@@ -276,6 +251,7 @@ function scenarioSlides(step: KStep, seed: number, topic: string): Slide[] | nul
       ? 'Correct. This is what the SOP requires.'
       : 'Not quite. This breaks the SOP.',
   }));
+
   const choices = arrangeChoices(base, seed).map((c) => ({ ...c, why: c.feedback }));
 
   return [
@@ -296,9 +272,9 @@ function scenarioSlides(step: KStep, seed: number, topic: string): Slide[] | nul
   ];
 }
 
-/* ------------------------------------------------------------------ */
-/* Main entry                                                          */
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ * Main entry                                                         *
+ * ------------------------------------------------------------------ */
 
 export function planKnowItSlides(lesson: Lesson): TeachMePlan {
   const d = collect(lesson);
@@ -315,9 +291,8 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
   });
 
   /* 2. OBJECTIVE */
-  // Use the short action titles (e.g. "Define the Problem"), not full SOP sentences
-  let objectives: string[] = uniq(d.steps.map((s) => clip(s.title, 70))).slice(0, 4);
-  if (!objectives.length) objectives = d.controls.slice(0, 3).map((c) => clip(c.rule, 100));
+  let objectives: string[] = uniq(d.steps.map((s) => clip(s.title, 70)));
+  if (!objectives.length) objectives = d.controls.map((c) => clip(c.rule, 100));
   if (!objectives.length) objectives = [`Understand ${d.topic}`];
   slides.push({
     type: 'OBJECTIVES',
@@ -341,38 +316,48 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     });
   }
 
-  /* 4. BEFORE YOU START */
-  const prep = uniq([...d.prereqs, ...d.tools]).slice(0, 6);
-  if (prep.length) {
-    slides.push({
-      type: 'SECTION_INTRO',
-      sec: 'Before you start',
-      title: 'Get Ready',
-      content: 'Make sure you have these in place before you begin.',
-      fl: prep,
-    });
-  }
-
-  /* 5. PROCESS OVERVIEW + 6. PROCESS STEPS */
-  if (d.steps.length) {
-    if (d.steps.length > 1) {
+  /* 4. BEFORE YOU START (Dynamic chunking for prereqs & tools without 6-item cap) */
+  const allPrep = uniq([...d.prereqs, ...d.tools]);
+  if (allPrep.length) {
+    const prepChunkSize = 6;
+    const totalPrepPages = Math.ceil(allPrep.length / prepChunkSize);
+    for (let i = 0; i < allPrep.length; i += prepChunkSize) {
+      const chunk = allPrep.slice(i, i + prepChunkSize);
+      const pageNum = Math.floor(i / prepChunkSize) + 1;
       slides.push({
         type: 'SECTION_INTRO',
-        sec: 'The process',
-        title: `${d.steps.length} Steps, Start to Finish`,
-        content: 'Here is the flow. Next, we go through each step.',
-        fl: d.steps.slice(0, 9).map((s) => clip(s.title, 60)),
+        sec: 'Before you start',
+        title: totalPrepPages > 1 ? `Get Ready (${pageNum}/${totalPrepPages})` : 'Get Ready',
+        content: 'Make sure you have these in place before you begin.',
+        fl: chunk,
       });
+    }
+  }
+
+  /* 5. PROCESS OVERVIEW + 6. PROCESS STEPS (Dynamic overview chunking without 9-step cap) */
+  if (d.steps.length) {
+    if (d.steps.length > 1) {
+      const overviewChunkSize = 9;
+      const totalOverviewPages = Math.ceil(d.steps.length / overviewChunkSize);
+      for (let i = 0; i < d.steps.length; i += overviewChunkSize) {
+        const chunk = d.steps.slice(i, i + overviewChunkSize);
+        const pageNum = Math.floor(i / overviewChunkSize) + 1;
+        slides.push({
+          type: 'SECTION_INTRO',
+          sec: 'The process',
+          title: totalOverviewPages > 1 ? `${d.steps.length} Steps, Start to Finish (${pageNum}/${totalOverviewPages})` : `${d.steps.length} Steps, Start to Finish`,
+          content: 'Here is the flow. Next, we go through each step.',
+          fl: chunk.map((s) => clip(s.title, 60)),
+        });
+      }
     }
 
     const group = d.steps.length <= 6 ? 1 : 2;
     const total = Math.ceil(d.steps.length / group);
-
     for (let i = 0; i < d.steps.length; i += group) {
       const chunk = d.steps.slice(i, i + group);
       const n = Math.floor(i / group) + 1;
       let items: string[];
-
       if (group === 1) {
         const s = chunk[0];
         const why = usefulWhy(s.why, s.text);
@@ -383,7 +368,6 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       } else {
         items = chunk.map((s) => clip(s.text, 170));
       }
-
       slides.push({
         type: 'TEACH_STEP',
         step: `Step ${n} of ${total}`,
@@ -396,22 +380,28 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 7. DECISION POINTS */
+  /* 7. DECISION POINTS (Dynamic chunking without 4-item cap) */
   if (d.decisions.length) {
-    const items = d.decisions.slice(0, 4).map((x) => `${clip(x.situation, 90)} → ${clip(x.action, 90)}`);
-    slides.push({
-      type: 'TEACH_STEP',
-      step: 'Decision points',
-      title: 'When You Need to Decide',
-      ic: 'check',
-      items,
-      content: items.join('\n'),
-      evidenceSource: 'SOP decision points',
-    });
+    const decisionChunkSize = 4;
+    const totalDecisionPages = Math.ceil(d.decisions.length / decisionChunkSize);
+    for (let i = 0; i < d.decisions.length; i += decisionChunkSize) {
+      const chunk = d.decisions.slice(i, i + decisionChunkSize);
+      const pageNum = Math.floor(i / decisionChunkSize) + 1;
+      const items = chunk.map((x) => `${clip(x.situation, 90)} → ${clip(x.action, 90)}`);
+      slides.push({
+        type: 'TEACH_STEP',
+        step: totalDecisionPages > 1 ? `Decision points (${pageNum}/${totalDecisionPages})` : 'Decision points',
+        title: 'When You Need to Decide',
+        ic: 'check',
+        items,
+        content: items.join('\n'),
+        evidenceSource: 'SOP decision points',
+      });
+    }
   }
 
-  /* 8. CRITICAL RULES */
-  d.controls.slice(0, 3).forEach((c) => {
+  /* 8. CRITICAL RULES (All controls included without 3-rule cap) */
+  d.controls.forEach((c) => {
     const rule = clip(c.rule, 150);
     const why = c.why ? clip(c.why, 160) : 'Do not skip or work around this rule.';
     slides.push({
@@ -429,49 +419,65 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     });
   });
 
-  /* 9. DO / DON'T */
-  const mistakes = d.mistakes.slice(0, 3);
-  if (mistakes.length) {
-    const donts = mistakes.map((m) => clip(m.mistake, 110));
-    const dos = mistakes.filter((m) => m.fix).map((m) => clip(m.fix, 110));
-    if (dos.length) {
+  /* 9. DO / DON'T (Dynamic chunking without 3-mistake cap) */
+  if (d.mistakes.length) {
+    const mistakeChunkSize = 3;
+    const totalMistakePages = Math.ceil(d.mistakes.length / mistakeChunkSize);
+    for (let i = 0; i < d.mistakes.length; i += mistakeChunkSize) {
+      const chunk = d.mistakes.slice(i, i + mistakeChunkSize);
+      const pageNum = Math.floor(i / mistakeChunkSize) + 1;
+      const donts = chunk.map((m) => clip(m.mistake, 110));
+      const dos = chunk.filter((m) => m.fix).map((m) => clip(m.fix!, 110));
+      const effectiveDos = dos.length ? dos : ['Follow SOP instructions carefully.'];
       slides.push({
         type: 'DO_DONT',
-        title: 'Do and Don’t',
+        title: totalMistakePages > 1 ? `Do and Don’t (${pageNum}/${totalMistakePages})` : 'Do and Don’t',
         content: 'Common mistakes and how to avoid them.',
-        dos,
+        dos: effectiveDos,
         donts,
-        comparison: { do: dos, dont: donts },
+        comparison: { do: effectiveDos, dont: donts },
       });
     }
   }
 
-  /* 10. EXCEPTIONS */
+  /* 10. EXCEPTIONS (Dynamic chunking without 4-exception cap) */
   if (d.exceptions.length) {
-    const items = d.exceptions.slice(0, 4).map((e) => `${clip(e.trigger, 90)} → ${clip(e.resolution, 100)}`);
-    slides.push({
-      type: 'TEACH_STEP',
-      step: 'Exceptions',
-      title: 'When Things Don’t Go to Plan',
-      ic: 'warn',
-      items,
-      content: items.join('\n'),
-      evidenceSource: 'SOP exceptions',
-    });
+    const exceptionChunkSize = 4;
+    const totalExceptionPages = Math.ceil(d.exceptions.length / exceptionChunkSize);
+    for (let i = 0; i < d.exceptions.length; i += exceptionChunkSize) {
+      const chunk = d.exceptions.slice(i, i + exceptionChunkSize);
+      const pageNum = Math.floor(i / exceptionChunkSize) + 1;
+      const items = chunk.map((e) => `${clip(e.trigger, 90)} → ${clip(e.resolution, 100)}`);
+      slides.push({
+        type: 'TEACH_STEP',
+        step: totalExceptionPages > 1 ? `Exceptions (${pageNum}/${totalExceptionPages})` : 'Exceptions',
+        title: 'When Things Don’t Go to Plan',
+        ic: 'warn',
+        items,
+        content: items.join('\n'),
+        evidenceSource: 'SOP exceptions',
+      });
+    }
   }
 
-  /* 11. ESCALATION */
+  /* 11. ESCALATION (Dynamic chunking without 4-escalation cap) */
   if (d.escalations.length) {
-    const items = d.escalations.slice(0, 4).map((e) => `${clip(e.situation, 90)} → ${clip(e.action, 100)}`);
-    slides.push({
-      type: 'TEACH_STEP',
-      step: 'Escalation',
-      title: 'When to Escalate',
-      ic: 'warn',
-      items,
-      content: items.join('\n'),
-      evidenceSource: 'SOP escalation',
-    });
+    const escalationChunkSize = 4;
+    const totalEscalationPages = Math.ceil(d.escalations.length / escalationChunkSize);
+    for (let i = 0; i < d.escalations.length; i += escalationChunkSize) {
+      const chunk = d.escalations.slice(i, i + escalationChunkSize);
+      const pageNum = Math.floor(i / escalationChunkSize) + 1;
+      const items = chunk.map((e) => `${clip(e.situation, 90)} → ${clip(e.action, 100)}`);
+      slides.push({
+        type: 'TEACH_STEP',
+        step: totalEscalationPages > 1 ? `Escalation (${pageNum}/${totalEscalationPages})` : 'Escalation',
+        title: 'When to Escalate',
+        ic: 'warn',
+        items,
+        content: items.join('\n'),
+        evidenceSource: 'SOP escalation',
+      });
+    }
   }
 
   /* 12. CHECK YOURSELF (AI-written scenarios only; never templated ones) */
@@ -494,7 +500,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
         .map((l) => l.trim())
         .filter((l) => l.length >= 25 && !META_LINE.test(l))
         .map((l) => clip(l, 150))
-    ).slice(0, 5);
+    );
     if (lines.length) {
       slides.push({
         type: 'TEACH_STEP',
@@ -513,8 +519,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     ...d.controls.map((c) => clip(c.rule, 110)),
     ...d.escalations.map((e) => `Escalate: ${clip(e.situation, 90)}`),
     ...d.steps.map((s) => clip(s.text, 110)),
-  ]).slice(0, 5);
-
+  ]);
   if (takeaways.length) {
     slides.push({
       type: 'KEY_TAKEAWAYS',
@@ -533,7 +538,63 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     nb: 'See the steps in action, then practise them with a coach.',
   });
 
-  // Diagnostic so a future "wrong content" report is easy to trace
+  /* ================================================================ *
+   * FINAL COVERAGE CHECK                                             *
+   * ================================================================ */
+  const missingItems: string[] = [];
+
+  d.steps.forEach((s) => {
+    const found = slides.some((sl) =>
+      (sl.title && sl.title.toLowerCase().includes(s.title.toLowerCase())) ||
+      (sl.content && sl.content.toLowerCase().includes(s.text.toLowerCase())) ||
+      (sl.items && sl.items.some((item) => item.toLowerCase().includes(s.text.toLowerCase()) || item.toLowerCase().includes(s.title.toLowerCase()))) ||
+      (sl.fl && sl.fl.some((f) => f.toLowerCase().includes(s.title.toLowerCase())))
+    );
+    if (!found) missingItems.push(`Step: ${s.title} (${s.text})`);
+  });
+
+  d.controls.forEach((c) => {
+    const found = slides.some((sl) =>
+      (sl.title && sl.title.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20))) ||
+      (sl.content && sl.content.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20))) ||
+      (sl.gurujiCoaching && sl.gurujiCoaching.explanation.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20)))
+    );
+    if (!found) missingItems.push(`Control: ${c.rule}`);
+  });
+
+  allPrep.forEach((p) => {
+    const found = slides.some((sl) => sl.fl && sl.fl.some((f) => f.toLowerCase().includes(p.toLowerCase().slice(0, 20))));
+    if (!found) missingItems.push(`Prereq/Tool: ${p}`);
+  });
+
+  d.mistakes.forEach((m) => {
+    const found = slides.some((sl) =>
+      (sl.donts && sl.donts.some((dt) => dt.toLowerCase().includes(m.mistake.toLowerCase().slice(0, 20)))) ||
+      (sl.dos && sl.dos.some((ds) => m.fix && ds.toLowerCase().includes(m.fix.toLowerCase().slice(0, 20))))
+    );
+    if (!found) missingItems.push(`Mistake: ${m.mistake}`);
+  });
+
+  d.decisions.forEach((dec) => {
+    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(dec.situation.toLowerCase().slice(0, 20))));
+    if (!found) missingItems.push(`Decision: ${dec.situation}`);
+  });
+
+  d.exceptions.forEach((exc) => {
+    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(exc.trigger.toLowerCase().slice(0, 20))));
+    if (!found) missingItems.push(`Exception: ${exc.trigger}`);
+  });
+
+  d.escalations.forEach((esc) => {
+    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(esc.situation.toLowerCase().slice(0, 20))));
+    if (!found) missingItems.push(`Escalation: ${esc.situation}`);
+  });
+
+  if (missingItems.length > 0) {
+    console.warn('[KnowIt Planner Coverage Warning] Unrepresented source items detected in deck:', missingItems);
+  }
+
+  // Diagnostic
   console.log('[KnowIt planner]', {
     lessonId: lesson.id,
     topic: d.topic,
@@ -545,9 +606,11 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     mistakes: d.mistakes.length,
     exceptions: d.exceptions.length,
     escalations: d.escalations.length,
+    decisions: d.decisions.length,
     changes: changes.length,
     scenarios: scenarioCount,
     slides: slides.length,
+    missingItemsCount: missingItems.length,
   });
 
   return { lessonId: lesson.id, title: lesson.title, slides };
