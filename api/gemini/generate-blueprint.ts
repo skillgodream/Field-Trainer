@@ -15,21 +15,37 @@ function getApiKey(req?: any): string | undefined {
     process.env.API_KEY ||
     ''
   ).trim();
+
   return rawKey.replace(/^["']|["']$/g, '').trim() || undefined;
 }
 
+const MODEL_PRO = 'gemini-2.5-pro';
+const MODEL_FAST = 'gemini-2.5-flash';
+
 export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
   const apiKey = getApiKey(req);
   if (!apiKey) {
-    console.error('[API Error] GEMINI_API_KEY is not defined in deployment environment variables.');
-    return res.status(500).json({ error: 'Server configuration error: Missing API Key' });
+    console.warn('[Serverless /api/gemini/generate-blueprint] No Gemini API key found.');
+    return res.json({
+      success: false,
+      useLocalGenerator: true,
+      reason: 'GEMINI_API_KEY is not configured on server or in request headers. Fallback to local domain-neutral generator.',
+    });
   }
 
-  const { rawText, fileBase64, mimeType, filename, pageCount, wordCount } = req.body;
+  const { rawText, fileBase64, mimeType, filename, pageCount, wordCount } = req.body || {};
 
   try {
     const ai = new GoogleGenAI({
@@ -42,10 +58,10 @@ export default async function handler(req: any, res: any) {
     });
 
     const parts: any[] = [];
-    const docText = rawText ? rawText.slice(0, 16000) : '';
+    const docText = rawText ? rawText.slice(0, 48000) : '';
 
     if (docText && docText.length > 50) {
-      // Use text directly
+      // Document text is provided
     } else if (fileBase64 && typeof fileBase64 === 'string') {
       parts.push({
         inlineData: {
@@ -55,21 +71,56 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const systemInstruction = `You are a Lead Operational Intelligence Engineer and Instructional Designer.
-Your task is to transform an uploaded Standard Operating Procedure (SOP) into a structured OPERATIONAL BLUEPRINT.
+    const systemInstruction = `You are a World-Class Lead Operational Intelligence Engineer and Instructional Designer for Guruji Work Coach.
+LAW 3 — UNIVERSAL 8-STAGE OPERATIONAL LEARNING FRAMEWORK
+The 8 stages are the Brain's universal framework for analysing and organising ANY SOP.
+They are NOT a mandatory 8-slide structure.
+The Brain must examine the SOP through all 8 stages and use only the stages that contain meaningful source-supported content. It may combine, expand or skip stages depending on the SOP.
 
-CRITICAL RULES:
-1. DISTINGUISH METADATA VS OPERATIONAL CONTENT:
-   - METADATA (DO NOT MAKE INTO STEPS): Document titles, REF codes ("DOCUMENT REF: SOP-HTL-101"), Version numbers ("VERSION 1.0"), Effective dates, Approvals, Section headers.
+1. ORIENT: What is the job/task? Why is it being done? What is the expected outcome? What is the worker responsible for?
+2. PREPARE: What must the worker check, arrange, confirm or understand before starting? (Tools, information, prerequisites, environment, details).
+3. PERFORM: What does the worker actually do? Extract the real operational steps and preserve their correct sequence.
+4. CONTROL: What must the worker verify while performing the task? Include safety, quality, accuracy, compliance, customer, equipment or other critical controls.
+5. DECIDE: Where does the worker need to make a judgement? Identify the condition, available actions and the correct SOP-supported response.
+6. HANDLE: What happens when the normal process does not go as expected? Include exceptions, unusual conditions, missing information, failed checks or process deviations.
+7. ESCALATE: When is the issue beyond the worker's authority or capability? Identify when to stop, who/what to escalate to and what must happen before continuing.
+8. PROVE: What does the worker need to demonstrate to show that the critical learning has been understood? Use the most important steps, controls, decisions or exceptions from the SOP.
+
+SYNTHESIS RULE:
+SOP → analyse through 8 stages → identify meaningful content → remove duplication → preserve critical details → arrange progressively → create the required training pages.
+- Do NOT force an SOP into all 8 stages.
+- Do NOT create empty pages just because a stage exists.
+- Do NOT invent content to fill a stage.
+- The 8 stages control the Brain's thinking and sequencing; the SOP controls the actual content.
+
+CRITICAL ARCHITECTURAL RULES:
+1. CONCISE WORKPLACE LANGUAGE (NO RAW TEXT DUMPS):
+   - NEVER output long, run-on paragraph sentences concatenating multiple SOP lines.
+   - Summarize every choice title into a crisp, COMPLETE, 5-12 word action statement written in natural workplace language.
+   - NEVER end a choice title on a dangling conjunction or preposition (e.g., 'and', 'or', 'to', 'with', 'for'). Ensure every title is a full, grammatically complete action phrase.
+   - Keep scenario questions under 2 concise sentences focused on a single execution dilemma.
+2. DEEP REALISM & UNCOMPROMISING SPECIFICITY:
+   - Ground ALL extractions strictly in the operational facts of the provided SOP document.
+   - Extract the TRUE frontline role and process described in the SOP without assuming an unrelated domain or industry.
+   - Every scenario question must put the worker in a concrete, high-stakes operational situation directly based on the SOP details.
+   - NEVER generate generic questions like "What is your required action?" or "How should you complete this task?".
+   - NEVER generate generic choices like "Skip step and proceed" or "Use unverified shortcut". Create REALISTIC frontline errors, tempting shortcuts, and common mistakes that real workers actually make on the floor!
+3. THREE NUANCED CHOICES WITH EXPLICIT FAILURE MODES:
+   - For EACH operational step, you MUST generate exactly 3 nuanced choices with short, complete, clear titles (5 to 12 words):
+     * Choice 1 (isCorrect: true): Concise, complete, compliant SOP action title. Subtitle explaining why this is correct per SOP.
+     * Choice 2 (isCorrect: false): Concise, complete, tempting operational shortcut title. Subtitle explicitly details the failure consequence.
+     * Choice 3 (isCorrect: false): Concise, complete, unapproved workaround title. Subtitle details the regulatory, safety, or quality violation.
+4. EXPERT COACH TIPS, SPECIFIC HINTS & LUCIDE VECTOR ICONS:
+   - coach_tip: Practical wisdom directly referencing subtle details, pitfalls, or mnemonic tips from the SOP.
+   - hint: Specific reference to the SOP document section, visual cues, or indicators.
+   - target_code: Authentic code extracted from or reflecting the SOP.
+   - icon_key: Assign a domain-appropriate, clean Lucide vector icon key (e.g., ShieldAlert, ScanBarcode, FileCheck, ClipboardCheck, Users, CheckCircle, AlertTriangle, Scale, Lock).
+5. METADATA VS OPERATIONAL CONTENT:
+   - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories, ISO reference codes.
    - OPERATIONAL CONTENT (MUST DRIVE BLUEPRINT): Physical actions, system entries, verbal communications, verifications, decision points, exception handling, escalations.
-2. BEHAVIOR CHANGE TEST: Ask: "If this item were removed from the SOP, would the worker's actual physical, verbal, system or decision-making behavior change?"
-   - YES -> Candidate operational content
-   - NO -> Metadata / background context
-3. SOURCE GROUNDING: Ground ALL outputs strictly in the provided SOP text. Retain source quotes and references for EVERY operational step, decision, and rule.
-4. ZERO DOMAIN FALLBACKS: Extract the REAL role and domain (e.g., Phlebotomy Technician, Retail Cashier, Hotel Front Office Agent). NEVER fall back to generic warehouse/picking terms unless in source text.
-5. NO GENERIC TEMPLATE STRINGS: Do NOT output strings like "frontline specialist duties", "Follow written operational procedure guidelines carefully", "Approved Operational Rule", "Non-compliant action". Be specific to the SOP!`;
+6. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
 
-    const textPrompt = `Uploaded SOP Document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
+    const textPrompt = `Uploaded SOP Document: "${filename || 'Operational Procedure'}" (${pageCount || 1} pages, ${wordCount || 100} words)
 ${docText ? `Document Text:\n"""\n${docText}\n"""\n` : ''}
 
 Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
@@ -77,10 +128,11 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   "document_identity": {
     "doc_title": "${filename ? filename.replace(/\.(txt|pdf|docx)$/i, '') : 'Operational Procedure'}",
     "doc_ref": "Extracted document reference or empty",
-    "version": "Extracted version or empty"
+    "version": "Extracted version or empty",
+    "department": "Extracted department or operations division"
   },
-  "role": "Exact worker role described in SOP (e.g., Phlebotomy Technician, Retail Cashier, Hotel Front Office Agent)",
-  "process": "Exact core operational process (e.g., Patient Registration & Blood Collection, POS Return Processing, Guest Check-In)",
+  "role": "Exact worker role described in SOP",
+  "process": "Exact core operational process",
   "purpose": "1-2 sentence primary operational goal for the worker",
   "scope": "Applicable department or workspace boundaries",
   "prerequisites": [
@@ -94,12 +146,41 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   ],
   "operational_steps": [
     {
-      "instruction": "Specific, clear workplace action (e.g., Verify patient full name and date of birth against photo ID)",
+      "instruction": "Specific, clear workplace action grounded strictly in the SOP",
       "category": "DO" | "CHECK" | "KNOW" | "DECIDE" | "RESPOND" | "RECOVER" | "ESCALATE",
-      "why_it_matters": "Operational reason or consequence",
-      "action_verb": "Action verb",
+      "action_verb": "Primary action verb (e.g., Receive, Verify, Record, Forward)",
+      "task_title": "Concise 2-4 word operational action title",
+      "target_code": "Realistic code or form reference from SOP",
+      "why_it_matters": "Specific operational reason and consequence on safety, quality, or compliance",
       "critical_control": true/false,
-      "source": { "page_or_section": "Page 1 · Section 1", "source_ref": "S1.sec1", "source_text": "Exact quote from document" }
+      "scenario_question": "Authentic, vivid frontline workplace simulation question grounded strictly in the SOP",
+      "choices": [
+        {
+          "id": "c1",
+          "title": "Exact correct operational procedure according to the SOP",
+          "subtitle": "Compliant SOP standard procedure",
+          "isCorrect": true
+        },
+        {
+          "id": "c2",
+          "title": "Tempting shortcut or common frontline worker mistake",
+          "subtitle": "Failure mode consequence",
+          "isCorrect": false
+        },
+        {
+          "id": "c3",
+          "title": "Unapproved workaround or bypassed compliance check",
+          "subtitle": "Safety/compliance hazard: violates protocol",
+          "isCorrect": false
+        }
+      ],
+      "coach_tip": "Expert coach tip explaining insider nuances, memory cues, or compliance wisdom from the SOP",
+      "hint": "Specific clue pointing directly to the relevant section or indicator in the SOP",
+      "source": {
+        "page_or_section": "Page 1 · Section 1",
+        "source_ref": "S1.sec1",
+        "source_text": "Exact verbatim quote from document text"
+      }
     }
   ],
   "decision_points": [
@@ -129,54 +210,141 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   "source_evidence": [
     { "id": "E1", "page_or_section": "Page 1", "excerpt": "Document excerpt" }
   ],
+  "video_demonstration_plan": {
+    "strategy": "sequential_steps",
+    "total_clips": 3,
+    "clips": [
+      {
+        "clip_index": 1,
+        "step_ref": "Step 1: Receipt & Intake",
+        "title": "Immediate Response & Intake",
+        "duration_seconds": 8,
+        "key_action": "Specific physical action from SOP",
+        "veo_prompt": "Cinematic 720p 16:9 instructional video shot: Frontline professional executing compliant workplace procedure."
+      }
+    ]
+  },
   "confidence": 0.98
-}`;
+}
+
+Generate between 5 to 9 comprehensive operational_steps covering the entire lifecycle of the SOP.`;
 
     parts.push({ text: textPrompt });
 
     let response;
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: MODEL_PRO,
         contents: { parts },
         config: {
           systemInstruction,
           responseMimeType: 'application/json',
-          maxOutputTokens: 8192,
-          temperature: 0.2,
+          maxOutputTokens: 32768,
+          temperature: 0.25,
         },
       });
     } catch (primaryErr: any) {
-      console.warn('[api/gemini/generate-blueprint] Primary model failed, trying fallback gemini-flash-latest:', primaryErr?.message);
-      response = await ai.models.generateContent({
-        model: 'gemini-flash-latest',
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          maxOutputTokens: 8192,
-          temperature: 0.2,
-        },
-      });
+      console.warn(`[Serverless LLM Blueprint] Primary model ${MODEL_PRO} failed, trying ${MODEL_FAST}:`, primaryErr?.message);
+      try {
+        response = await ai.models.generateContent({
+          model: MODEL_FAST,
+          contents: { parts },
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            maxOutputTokens: 32768,
+            temperature: 0.25,
+          },
+        });
+      } catch (fallbackErr: any) {
+        console.warn(`[Serverless LLM Blueprint] Fallback model ${MODEL_FAST} failed, trying gemini-3.8-flash:`, fallbackErr?.message);
+        response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: { parts },
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            maxOutputTokens: 32768,
+            temperature: 0.25,
+          },
+        });
+      }
     }
 
     const outputText = response.text || '';
     if (!outputText.trim()) {
-      return res.status(200).json({ success: false, useLocalGenerator: true, error: 'Empty response received from LLM' });
+      return res.json({ success: false, useLocalGenerator: true, error: 'Empty response received from LLM' });
     }
 
     const parsedData = cleanAndRepairJson(outputText);
+
+    // Auto-synthesize video_demonstration_plan if LLM omitted it
+    if (!parsedData.video_demonstration_plan || !Array.isArray(parsedData.video_demonstration_plan.clips) || parsedData.video_demonstration_plan.clips.length === 0) {
+      const steps = parsedData.operational_steps || [];
+      const role = parsedData.role || 'Frontline professional';
+      const processName = parsedData.process || filename || 'Operational Task';
+      if (steps.length <= 2) {
+        parsedData.video_demonstration_plan = {
+          strategy: 'single_continuous_15s',
+          total_clips: 1,
+          clips: [{
+            clip_index: 1,
+            title: `Full Procedure: ${processName.slice(0, 36)}`,
+            duration_seconds: 15,
+            key_action: steps[0]?.instruction || processName,
+            veo_prompt: `Cinematic 720p 16:9 instructional video demonstration of "${processName}". Frontline ${role} performing: ${steps[0]?.instruction || processName}. Clear hand movements, standard workplace tools, photorealistic, clean industrial lighting.`
+          }]
+        };
+      } else {
+        const pre = steps[0] || { instruction: 'Prepare workspace and confirm procedure checklist', task_title: 'Preparation & Verification' };
+        const exec = steps[Math.floor(steps.length / 2)] || steps[1] || { instruction: 'Execute core operational step adhering to compliance rules', task_title: 'Core Execution' };
+        const verify = steps[steps.length - 1] || { instruction: 'Verify final state and record completion status', task_title: 'Verification & Handoff' };
+
+        parsedData.video_demonstration_plan = {
+          strategy: 'sequential_steps',
+          total_clips: 3,
+          clips: [
+            {
+              clip_index: 1,
+              step_ref: `Step 1: ${pre.task_title || 'Intake & Preparation'}`,
+              title: pre.task_title || 'Intake & Preparation',
+              duration_seconds: 8,
+              key_action: pre.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting initial step: ${pre.instruction}. Natural workplace environment, clear movements, compliant technique, photorealistic.`
+            },
+            {
+              clip_index: 2,
+              step_ref: `Step 2: ${exec.task_title || 'Execution'}`,
+              title: exec.task_title || 'Core Operational Action',
+              duration_seconds: 8,
+              key_action: exec.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} executing: ${exec.instruction}. Focused hand movements manipulating equipment, compliant technique, clean industrial lighting.`
+            },
+            {
+              clip_index: 3,
+              step_ref: `Step 3: ${verify.task_title || 'Verification'}`,
+              title: verify.task_title || 'Final Control & Verification',
+              duration_seconds: 8,
+              key_action: verify.instruction,
+              veo_prompt: `Cinematic 720p 16:9 instruction shot: Frontline ${role} conducting final inspection: ${verify.instruction}. Showing verification confirmation, scanning or logging result, crisp photorealism.`
+            }
+          ]
+        };
+      }
+    }
+
+    console.log(`[Serverless /api/gemini/generate-blueprint SUCCESS] Extracted ${parsedData.operational_steps?.length || 0} high-fidelity steps from '${filename}'`);
+
     return res.status(200).json({
       success: true,
       blueprint: parsedData,
     });
-  } catch (error: any) {
-    console.error('[API Error] Blueprint generation failed:', error);
-    return res.status(200).json({
+  } catch (err: any) {
+    console.error('[Serverless /api/gemini/generate-blueprint Error]:', err?.message || err);
+    return res.json({
       success: false,
       useLocalGenerator: true,
-      error: 'LLM_PARSE_OR_PROVIDER_ERROR',
-      message: error?.message || 'Blueprint generation failed, falling back to domain-neutral generator.',
+      error: err?.message || 'Server error, falling back to local generator.',
     });
   }
 }
@@ -204,42 +372,50 @@ function sanitizeJsonString(str: string): string {
         result += '\\r';
       } else if (ch === '\t') {
         result += '\\t';
+      } else if (ch.charCodeAt(0) < 32) {
+        result += ' ';
       } else {
         result += ch;
       }
     } else {
-      result += ch;
       if (ch === '"') {
         inString = true;
       }
+      result += ch;
     }
   }
   return result;
 }
 
-function repairTruncatedJson(jsonStr: string): string {
-  let text = jsonStr.trim().replace(/[,:\s]+$/, '');
+function repairTruncatedJson(str: string): string {
+  let text = str.trim();
+  const stack: string[] = [];
   let inString = false;
   let isEscaped = false;
-  const stack: string[] = [];
 
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+    const char = text[i];
     if (inString) {
       if (isEscaped) {
         isEscaped = false;
-      } else if (ch === '\\') {
+      } else if (char === '\\') {
         isEscaped = true;
-      } else if (ch === '"') {
+      } else if (char === '"') {
         inString = false;
       }
     } else {
-      if (ch === '"') {
+      if (char === '"') {
         inString = true;
-      } else if (ch === '{' || ch === '[') {
-        stack.push(ch);
-      } else if (ch === '}' || ch === ']') {
-        stack.pop();
+      } else if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}') {
+        if (stack.length > 0 && stack[stack.length - 1] === '{') {
+          stack.pop();
+        }
+      } else if (char === ']') {
+        if (stack.length > 0 && stack[stack.length - 1] === '[') {
+          stack.pop();
+        }
       }
     }
   }
@@ -247,6 +423,7 @@ function repairTruncatedJson(jsonStr: string): string {
   if (inString) {
     text += '"';
   }
+
   text = text.replace(/[,:\s]+$/, '');
 
   while (stack.length > 0) {
@@ -271,13 +448,12 @@ function cleanAndRepairJson(rawText: string): any {
     text = text.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
 
-  // Find the first and last of either '{' / '}' or '[' / ']'
   const firstBrace = text.indexOf('{');
   const firstBracket = text.indexOf('[');
-  
+
   let startIdx = -1;
   let endChar = '';
-  
+
   if (firstBrace !== -1 && firstBracket !== -1) {
     if (firstBrace < firstBracket) {
       startIdx = firstBrace;
