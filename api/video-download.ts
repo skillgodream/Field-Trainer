@@ -26,11 +26,12 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, Authorization');
 
-  if (req.method === 'OPTIONS') {
+  const method = (req.method || '').toUpperCase();
+  if (method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
+  if (method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
 
@@ -39,7 +40,13 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ success: false, error: 'Gemini API key is not configured in server environment or request headers.' });
   }
 
-  const { operationName, lessonId, clipIndex = 1 } = req.body || {};
+  let bodyData = req.body;
+  if (typeof bodyData === 'string') {
+    try {
+      bodyData = JSON.parse(bodyData);
+    } catch (_) {}
+  }
+  const { operationName, lessonId, clipIndex = 1 } = bodyData || {};
   if (!operationName) {
     return res.status(400).json({ success: false, error: 'operationName is required.' });
   }

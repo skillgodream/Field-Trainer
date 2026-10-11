@@ -148,18 +148,58 @@ export interface OperationalBlueprint {
 
 export interface VideoClipPlan {
   clip_index: number;
-  step_ref?: string;
+  scene_id?: string;
   title: string;
+  purpose?: string;
+  step_ref?: string;
+  covered_step_refs?: string[];
+  critical_action?: string;
+  control_or_decision?: string;
+  exception_or_escalation?: string;
+  what_the_learner_should_see?: string;
+  what_the_learner_should_understand?: string;
+  on_screen_text?: string;
   duration_seconds: number;
+  estimated_duration_seconds?: number;
   veo_prompt: string;
   key_action?: string;
   tool_or_hazard?: string;
+}
+
+export interface ExcludedFromVideoItem {
+  item_ref: string;
+  item_type: 'step' | 'control' | 'decision' | 'exception' | 'escalation' | 'safety_rule';
+  description: string;
+  reason: string;
+  disposition?: 'assigned_to_guide_me' | 'assigned_to_test_me' | 'assigned_to_know_it' | 'unresolved_review_required';
+  assigned_mode?: 'Know It' | 'Guide Me' | 'Test Me' | 'Unresolved';
+}
+
+export interface VideoCoverageLedgerItem {
+  item_id: string;
+  item_type: 'step' | 'control' | 'decision' | 'exception' | 'escalation' | 'safety_rule';
+  source_ref: string;
+  description: string;
+  disposition: 'represented_in_video' | 'assigned_to_learning_mode' | 'unresolved_review_required';
+  assigned_scene_id?: string;
+  assigned_scene_index?: number;
+  assigned_mode?: 'Show Me' | 'Guide Me' | 'Test Me' | 'Know It' | 'Unresolved';
+  reason?: string;
+  confidence: 'high' | 'medium' | 'unresolved';
+  coverage_status?: 'planned' | 'verified_instructional_coverage';
+  instructional_proof?: string;
 }
 
 export interface VideoDemonstrationPlan {
   strategy: 'single_continuous_15s' | 'sequential_steps';
   total_clips: number;
   clips: VideoClipPlan[];
+  total_estimated_duration_seconds?: number;
+  excluded_from_video?: ExcludedFromVideoItem[];
+  coverage_ledger?: VideoCoverageLedgerItem[];
+  unresolved_items?: VideoCoverageLedgerItem[];
+  validation_status?: 'valid' | 'invalid';
+  validation_errors?: string[];
 }
 
 export interface Lesson {

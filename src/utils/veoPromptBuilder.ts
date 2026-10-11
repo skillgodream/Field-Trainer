@@ -10,6 +10,8 @@ export interface VeoPromptOptions {
   taskTitle?: string;
   actionInstruction: string;
   stepIndex?: number;
+  criticalControl?: string;
+  decisionOrException?: string;
 }
 
 interface DomainPreset {
@@ -173,10 +175,16 @@ function toContinuousAction(rawAction: string): string {
  * Assembles a dense 65-85 word prompt optimized for Google Veo 3.2 Lite
  */
 export function buildVeoPrompt(options: VeoPromptOptions): string {
-  const { role = 'frontline professional', process = 'operational procedure', actionInstruction } = options;
-  const contextText = `${role} ${process} ${actionInstruction}`;
+  const { role = 'frontline professional', process = 'operational procedure', actionInstruction, criticalControl, decisionOrException } = options;
+  const contextText = `${role} ${process} ${actionInstruction} ${criticalControl || ''} ${decisionOrException || ''}`;
   const preset = getDomainPreset(contextText);
-  const continuousAction = toContinuousAction(actionInstruction);
+  let continuousAction = toContinuousAction(actionInstruction);
+
+  if (criticalControl && !continuousAction.toLowerCase().includes(criticalControl.toLowerCase().slice(0, 15))) {
+    continuousAction += ` while applying critical control (${criticalControl.replace(/\.$/, '')})`;
+  } else if (decisionOrException && !continuousAction.toLowerCase().includes(decisionOrException.toLowerCase().slice(0, 15))) {
+    continuousAction += ` while executing procedure (${decisionOrException.replace(/\.$/, '')})`;
+  }
 
   // 5-element composition:
   // 1. Visual Style: Photorealistic 720p 16:9 cinematic instructional demonstration.

@@ -21,6 +21,7 @@ import {
   VideoDemonstrationPlan,
 } from '../types';
 import { buildVeoPrompt } from './veoPromptBuilder';
+import { planVideoDemonstration } from './videoPlanEngine';
 
 const METADATA_PATTERNS = [
   /^standard operating procedure/i,
@@ -68,19 +69,25 @@ export function buildSopKnowledgeModel(extracted: ExtractedDocument): SopKnowled
   const rawText = extracted.rawText;
   const lowerText = rawText.toLowerCase();
 
-  let role = 'Frontline Worker';
+  let role = 'Workplace Professional';
   let process = extracted.filename.replace(/\.(txt|pdf|docx)$/i, '');
   let department = 'Operations';
 
   if (lowerText.includes('housekeeping') || lowerText.includes('cleaning') || lowerText.includes('residential') || lowerText.includes('janitorial')) {
     role = 'Housekeeping Attendant';
     department = 'Housekeeping';
-  } else if (lowerText.includes('warehouse') || lowerText.includes('inventory') || lowerText.includes('stock')) {
+  } else if (lowerText.includes('warehouse') || lowerText.includes('inventory') || lowerText.includes('stock') || lowerText.includes('picker')) {
     role = 'Warehouse Associate';
     department = 'Logistics';
   } else if (lowerText.includes('safety') || lowerText.includes('hazard') || lowerText.includes('ppe')) {
     role = 'Safety Inspector';
     department = 'EHS';
+  } else if (lowerText.includes('posh') || lowerText.includes('sexual harassment') || lowerText.includes('workplace conduct') || lowerText.includes('hr compliance') || lowerText.includes('internal committee')) {
+    role = 'Workplace Professional';
+    department = 'HR & Compliance';
+  } else if (lowerText.includes('front office') || lowerText.includes('guest') || lowerText.includes('orchid suite') || lowerText.includes('hotel')) {
+    role = 'Front Office Associate';
+    department = 'Hospitality';
   }
 
   const rawLines = rawText
@@ -548,6 +555,39 @@ export function generateLessonFromOperationalBlueprint(
     };
   });
 
+  // Incorporate controls assigned to Guide Me / Test Me into simulatorSteps so destination learning content actually exists
+  const unrepresentedControls = (opBlueprint.critical_controls || []).filter(c => 
+    !steps.some(s => s.instruction.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20)))
+  );
+
+  unrepresentedControls.forEach((c, cIdx) => {
+    const stepNum = simulatorSteps.length + 1;
+    simulatorSteps.push({
+      id: stepNum,
+      title: `Critical Control: ${c.rule.slice(0, 35)}`,
+      type: 'safety',
+      question: `Compliance Assessment: What is the mandatory protocol regarding "${c.rule}"?`,
+      taskTitle: process,
+      taskOrder: `Control Check ${cIdx + 1}`,
+      taskItem: c.rule,
+      targetCode: `CTRL-${cIdx + 1}`,
+      targetQty: 1,
+      sku: `CTRL-${cIdx + 1}`,
+      priority: 'High Priority',
+      choices: [
+        { id: 'c1', title: `Strictly adhere: ${c.rule}`, subtitle: 'Mandatory standard compliance requirement', isCorrect: true },
+        { id: 'c2', title: `Proceed with bypass to save operational time`, subtitle: 'Severe compliance violation', isCorrect: false },
+        { id: 'c3', title: `Delegate verification to uncertified staff`, subtitle: 'Unapproved deviation', isCorrect: false },
+      ],
+      why: c.rationale || `Mandatory operational standard: ${c.rule}`,
+      coachTip: `Always enforce written compliance rule: ${c.rule}`,
+      hint: `Refer to SOP compliance controls for ${process}`,
+      source_ref: c.source_ref || `ctrl-${cIdx + 1}`,
+      page_or_section: 'Compliance Controls',
+      evidence: c.rule,
+    });
+  });
+
   const stepObjects: StepObject[] = simulatorSteps.map((simStep, idx) => {
     let cleanTitle = simStep.title;
     const titleLow = (cleanTitle || '').toLowerCase();
@@ -627,6 +667,21 @@ export function generateLessonFromOperationalBlueprint(
       source_ref: 'S1.control',
     },
   ];
+
+  if (opBlueprint.prerequisites && opBlueprint.prerequisites.length > 0) {
+    opBlueprint.prerequisites.forEach((pre, idx) => {
+      orientationCards.push({
+        id: `card_prereq_${idx + 1}`,
+        kind: 'rule',
+        title: `Prerequisite Qualification ${idx + 1}`,
+        body: pre.text,
+        audio_text: `Mandatory prerequisite: ${pre.text}`,
+        visual: { type: 'icon', ref: 'rule' },
+        must_view: true,
+        source_ref: pre.source_ref || `pre-${idx + 1}`,
+      });
+    });
+  }
 
   const passport: ProcessPassport = {
     process_name: process,
@@ -783,88 +838,20 @@ export function generateLessonFromOperationalBlueprint(
   }
 
   const videoPlan: VideoDemonstrationPlan = (() => {
-    if (opBlueprint.video_demonstration_plan?.clips && opBlueprint.video_demonstration_plan.clips.length > 0) {
-      return opBlueprint.video_demonstration_plan;
+    // If the blueprint already has a fully validated, multi-scene plan with covered_step_refs, preserve it
+    const existing = opBlueprint.video_demonstration_plan;
+    if (
+      existing &&
+      existing.validation_status === 'valid' &&
+      Array.isArray(existing.clips) &&
+      existing.clips.length > 0 &&
+      existing.clips.every(c => Array.isArray(c.covered_step_refs) && c.covered_step_refs.length > 0)
+    ) {
+      return existing;
     }
 
-    const steps = opBlueprint.operational_steps || [];
-    const role = opBlueprint.role || 'frontline professional';
-    const processName = opBlueprint.process;
-
-    if (steps.length <= 2) {
-      const mainAction = steps[0]?.instruction || processName;
-      return {
-        strategy: 'single_continuous_15s',
-        total_clips: 1,
-        clips: [
-          {
-            clip_index: 1,
-            title: `Full Procedure: ${processName.slice(0, 36)}`,
-            duration_seconds: 15,
-            key_action: mainAction,
-            veo_prompt: buildVeoPrompt({
-              role,
-              process: processName,
-              actionInstruction: mainAction,
-              stepIndex: 1,
-            }),
-          },
-        ],
-      };
-    }
-
-    const prepStep = steps[0] || { instruction: 'Prepare workspace and confirm checklist', task_title: 'Preparation & Check' };
-    const execStep = steps[Math.floor(steps.length / 2)] || steps[1] || { instruction: 'Execute core operational step', task_title: 'Core Operational Action' };
-    const verifyStep = steps[steps.length - 1] || { instruction: 'Verify final state and record completion status', task_title: 'Verification & Handoff' };
-
-    return {
-      strategy: 'sequential_steps',
-      total_clips: 3,
-      clips: [
-        {
-          clip_index: 1,
-          step_ref: `Step 1: ${prepStep.task_title || 'Preparation'}`,
-          title: prepStep.task_title || 'Preparation & Check',
-          duration_seconds: 8,
-          key_action: prepStep.instruction,
-          veo_prompt: buildVeoPrompt({
-            role,
-            process: processName,
-            taskTitle: prepStep.task_title,
-            actionInstruction: prepStep.instruction,
-            stepIndex: 1,
-          }),
-        },
-        {
-          clip_index: 2,
-          step_ref: `Step 2: ${execStep.task_title || 'Execution'}`,
-          title: execStep.task_title || 'Core Operational Action',
-          duration_seconds: 8,
-          key_action: execStep.instruction,
-          veo_prompt: buildVeoPrompt({
-            role,
-            process: processName,
-            taskTitle: execStep.task_title,
-            actionInstruction: execStep.instruction,
-            stepIndex: 2,
-          }),
-        },
-        {
-          clip_index: 3,
-          step_ref: `Step 3: ${verifyStep.task_title || 'Verification'}`,
-          title: verifyStep.task_title || 'Final Control & Verification',
-          duration_seconds: 8,
-          key_action: verifyStep.instruction,
-          veo_prompt: buildVeoPrompt({
-            role,
-            process: processName,
-            taskTitle: verifyStep.task_title,
-            actionInstruction: verifyStep.instruction,
-            stepIndex: 3,
-          }),
-        },
-      ],
-    };
+    // Authoritative generation: synthesize dynamic, SOP-grounded VideoPlan via planVideoDemonstration
+    return planVideoDemonstration(opBlueprint);
   })();
 
   const lesson: Lesson = {

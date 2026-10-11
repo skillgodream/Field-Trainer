@@ -313,6 +313,13 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
 
   // Start Generation: Generates ALL clips sequentially without human intervention
   const handleStartGeneration = async () => {
+    if (videoPlan?.validation_status === 'invalid') {
+      const errs = videoPlan.validation_errors || ['Video plan contains unresolved items or validation errors requiring instructional review.'];
+      setErrorMessage(`Plan Review Required: ${errs.join(' · ')}`);
+      setModalState('error');
+      return;
+    }
+
     setModalState('generating');
     setErrorMessage(null);
     setElapsedSeconds(0);
@@ -678,10 +685,16 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
               </button>
               <button
                 onClick={handleStartGeneration}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs sm:text-sm shadow-md transition-all hover:scale-[1.01] active:scale-[0.99]"
+                disabled={videoPlan?.validation_status === 'invalid'}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-md transition-all ${
+                  videoPlan?.validation_status === 'invalid'
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white hover:scale-[1.01] active:scale-[0.99]'
+                }`}
+                title={videoPlan?.validation_status === 'invalid' ? 'Plan contains unresolved items requiring review before generation' : undefined}
               >
                 <Sparkles size={15} />
-                <span>Generate Video Demonstration</span>
+                <span>{videoPlan?.validation_status === 'invalid' ? 'Review Required (Plan Invalid)' : 'Generate Video Demonstration'}</span>
               </button>
             </>
           )}

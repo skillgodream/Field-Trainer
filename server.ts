@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
+import { planVideoDemonstration } from './src/utils/videoPlanEngine';
 
 dotenv.config();
 
@@ -67,6 +68,16 @@ const app = express();
 const PORT: number = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '15mb' }));
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-gemini-api-key');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
 /**
  * Resolves the Gemini API Key dynamically from environment variables.
@@ -489,58 +500,11 @@ Generate between 5 to 9 comprehensive operational_steps covering the entire life
 
     const parsedData = cleanAndRepairJson(outputText);
 
-    // Auto-synthesize video_demonstration_plan if LLM omitted it
-    if (!parsedData.video_demonstration_plan || !Array.isArray(parsedData.video_demonstration_plan.clips) || parsedData.video_demonstration_plan.clips.length === 0) {
-      const steps = parsedData.operational_steps || [];
-      const role = parsedData.role || 'Frontline worker';
-      const processName = parsedData.process || filename || 'Operational Task';
-      if (steps.length <= 2) {
-        parsedData.video_demonstration_plan = {
-          strategy: 'single_continuous_15s',
-          total_clips: 1,
-          clips: [{
-            clip_index: 1,
-            title: `Full Procedure: ${processName.slice(0, 36)}`,
-            duration_seconds: 15,
-            key_action: steps[0]?.instruction || processName,
-            veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is continuously demonstrating ${processName} with steady, methodical movements. The setting is an authentic, well-organized professional workspace with standard equipment. Soft natural daylight balanced by warm commercial recessed lighting. Smooth continuous lateral camera tracking shot gently drifting forward.`
-          }]
-        };
-      } else {
-        const prep = steps[0];
-        const exec = steps[Math.floor(steps.length / 2)] || steps[1];
-        const verify = steps[steps.length - 1];
-        parsedData.video_demonstration_plan = {
-          strategy: 'sequential_steps',
-          total_clips: 3,
-          clips: [
-            {
-              clip_index: 1,
-              step_ref: `Step 1: ${prep.task_title || 'Prep'}`,
-              title: prep.task_title || 'Preparation & Check',
-              duration_seconds: 8,
-              key_action: prep.instruction,
-              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is methodically preparing and cross-checking: ${prep.instruction}, with deliberate continuous hand movements. Setting is an authentic professional workplace station with organized tools and documentation. Clean balanced commercial illumination. Slow cinematic lateral tracking shot drifting smoothly across the workstation.`
-            },
-            {
-              clip_index: 2,
-              step_ref: `Step 2: ${exec.task_title || 'Execution'}`,
-              title: exec.task_title || 'Core Operational Action',
-              duration_seconds: 8,
-              key_action: exec.instruction,
-              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is steadily executing: ${exec.instruction}, with steady, continuous manipulation of standard equipment. Setting is an organized operational environment. Soft balanced overhead lighting. Steady forward camera drift maintaining continuous focal depth.`
-            },
-            {
-              clip_index: 3,
-              step_ref: `Step 3: ${verify.task_title || 'Verification'}`,
-              title: verify.task_title || 'Final Control & Verification',
-              duration_seconds: 8,
-              key_action: verify.instruction,
-              veo_prompt: `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is carefully reviewing and verifying final completion: ${verify.instruction}, with continuous hand motions. Setting is a clean, compliant operational checkout bench. Warm natural fill lighting. Slow cinematic right-to-left tracking dolly shot maintaining continuous focus until the final frame.`
-            }
-          ]
-        };
-      }
+    // Authoritative VideoPlan synthesis via Guruji VideoPlan engine
+    try {
+      parsedData.video_demonstration_plan = planVideoDemonstration(parsedData);
+    } catch (vpErr) {
+      console.warn('[Server Veo VideoPlan synthesis warning]:', vpErr);
     }
 
     console.log(`[Server /api/gemini/generate-blueprint SUCCESS] Extracted ${parsedData.operational_steps?.length || 0} high-fidelity steps from '${filename}'`);

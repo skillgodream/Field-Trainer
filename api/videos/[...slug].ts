@@ -13,7 +13,8 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, Authorization');
 
-  if (req.method === 'OPTIONS') {
+  const method = (req.method || '').toUpperCase();
+  if (method === 'OPTIONS') {
     return res.status(200).end();
   }
 
