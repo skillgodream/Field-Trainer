@@ -23,6 +23,7 @@ import ValidationErrorModal from './components/ValidationErrorModal';
 import { MeetGurujiScreen } from './screens/MeetGurujiScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { DesignCheckScreen } from './screens/DesignCheckScreen';
+import { ContentCardScreen } from './screens/ContentCardScreen';
 
 import { INITIAL_LESSONS } from './data/lessonsData';
 import ProcessPassportModal from './components/ProcessPassportModal';
@@ -42,12 +43,20 @@ export default function App() {
     window.location.hash === '#design-check' ||
     window.location.pathname === '/design-check'
   );
+  const [isContentCard, setIsContentCard] = useState<boolean>(
+    window.location.hash === '#content-card' ||
+    window.location.pathname === '/content-card'
+  );
 
   React.useEffect(() => {
     const handleHashChange = () => {
       setIsDesignCheck(
         window.location.hash === '#design-check' ||
         window.location.pathname === '/design-check'
+      );
+      setIsContentCard(
+        window.location.hash === '#content-card' ||
+        window.location.pathname === '/content-card'
       );
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -101,13 +110,12 @@ export default function App() {
 
   const isPipelineProcessingRef = useRef<boolean>(false);
 
-  // Dynamic Background Management to completely eliminate any "white patch" / light background leakage on overscroll/elastic scroll
+  // Apple Dark Theme Canvas Background Management (black and translucent cards)
   React.useEffect(() => {
-    const isDarkTheme = (activeTab === 'home' && !selectedLesson && !activeSimulator && !isIntroDeckOpen && !isVideoDemoOpen) || isIntroDeckOpen || isVideoDemoOpen || analyzingSop !== null || isProcessing;
-    const targetColor = isDarkTheme ? '#070A14' : '#F7F7F5';
+    const targetColor = '#000000';
     document.body.style.backgroundColor = targetColor;
     document.documentElement.style.backgroundColor = targetColor;
-  }, [activeTab, selectedLesson, activeSimulator, isIntroDeckOpen, isVideoDemoOpen, analyzingSop, isProcessing]);
+  }, []);
 
   /**
    * AUTHORITATIVE SOP PIPELINE HANDLER
@@ -358,10 +366,19 @@ export default function App() {
     return <DesignCheckScreen onBack={() => { window.location.hash = ''; setIsDesignCheck(false); }} />;
   }
 
+  if (isContentCard) {
+    return <ContentCardScreen lesson={selectedLesson || undefined} onBack={() => { window.location.hash = ''; setIsContentCard(false); }} />;
+  }
+
   return (
-    <div className={`flex flex-col min-h-screen font-sans relative selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${
-      activeTab === 'home' ? 'bg-[#070A14] text-white' : 'bg-[#F7F7F5] text-[#0E1116]'
-    }`}>
+    <div className="flex flex-col min-h-screen font-sans relative bg-black text-white selection:bg-white/20 selection:text-white transition-colors duration-300 overflow-x-hidden">
+      {/* Ambient Apple VisionOS Specular Glow Layer */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-black">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[500px] rounded-full bg-white/[0.03] blur-[140px]" />
+        <div className="absolute top-1/3 -right-24 w-[400px] h-[400px] rounded-full bg-indigo-500/[0.03] blur-[120px]" />
+        <div className="absolute bottom-20 -left-20 w-[450px] h-[450px] rounded-full bg-slate-500/[0.03] blur-[130px]" />
+      </div>
+
       {/* Main Tab Views & Bottom Navigation (only rendered when NOT in an active lesson, deck, or simulation) */}
       {!selectedLesson && !activeSimulator && !isIntroDeckOpen && (
         <>

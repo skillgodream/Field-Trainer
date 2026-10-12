@@ -1,5 +1,13 @@
 import React from 'react';
-import ClayArt from './ClayArt';
+import { 
+  Scan, 
+  Package, 
+  Layers, 
+  ShieldCheck, 
+  ClipboardCheck, 
+  ShoppingCart, 
+  Sparkles 
+} from 'lucide-react';
 
 interface LessonCardProps {
   title: string;
@@ -14,54 +22,67 @@ interface LessonCardProps {
 export default function LessonCard({
   title,
   subtitle,
-  color,
-  icon: Icon,
+  icon: CustomIcon,
   artType,
   progress = 50,
   onClick,
 }: LessonCardProps) {
-  const radius = 22;
+  const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  // Apple-grade minimalist monochrome icon mapping
+  const renderIcon = () => {
+    if (CustomIcon) {
+      return <CustomIcon size={18} className="text-white" />;
+    }
+    switch (artType) {
+      case 'scanner':
+        return <Scan size={18} className="text-white" />;
+      case 'box':
+        return <Package size={18} className="text-white" />;
+      case 'tote':
+        return <Layers size={18} className="text-white" />;
+      case 'safety':
+        return <ShieldCheck size={18} className="text-white" />;
+      case 'clipboard':
+        return <ClipboardCheck size={18} className="text-white" />;
+      case 'trolley':
+        return <ShoppingCart size={18} className="text-white" />;
+      default:
+        return <Sparkles size={18} className="text-white" />;
+    }
+  };
 
   return (
     <button
       onClick={onClick}
-      className={`text-left w-full p-4 sm:p-5 rounded-[28px] shadow-[0_4px_16px_rgba(16,24,40,0.04)] border border-black/5 flex flex-col justify-between transition-all duration-200 active:scale-[0.97] hover:shadow-md cursor-pointer`}
-      style={{
-        backgroundColor:
-          color === 'sky'
-            ? '#DCEBFF'
-            : color === 'mint'
-            ? '#DDF3E6'
-            : color === 'peach'
-            ? '#FFE6D2'
-            : color === 'lilac'
-            ? '#E8E1FF'
-            : color === 'butter'
-            ? '#FFF2C9'
-            : '#FBE0EA',
-      }}
+      className="group relative text-left w-full p-4 sm:p-5 rounded-[28px] bg-[#0E1017]/85 hover:bg-[#151923]/95 active:scale-[0.98] backdrop-blur-2xl border border-white/[0.08] hover:border-white/20 shadow-[0_12px_40px_rgba(0,0,0,0.55)] flex flex-col justify-between transition-all duration-200 cursor-pointer overflow-hidden min-h-[178px]"
     >
-      <div className="flex items-start justify-between w-full mb-3">
-        {/* Progress Ring with Clay/Icon Artwork inside */}
-        <div className="relative w-12 h-12 shrink-0">
+      {/* Apple specular top glass rim */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
+      {/* Top Bar: Monochrome Progress Dial & Apple Percentage Pill */}
+      <div className="flex items-start justify-between w-full mb-3 relative z-10">
+        {/* Apple Monochromatic Progress Dial */}
+        <div className="relative w-11 h-11 shrink-0">
           <svg className="w-full h-full -rotate-90">
+            {/* Background track */}
             <circle
-              cx="24"
-              cy="24"
+              cx="22"
+              cy="22"
               r={radius}
-              stroke="white"
-              strokeWidth="3.5"
-              fill="white"
-              fillOpacity="0.45"
+              stroke="rgba(255, 255, 255, 0.12)"
+              strokeWidth="2.75"
+              fill="rgba(255, 255, 255, 0.04)"
             />
+            {/* White active progress arc */}
             <circle
-              cx="24"
-              cy="24"
+              cx="22"
+              cy="22"
               r={radius}
-              stroke="#0E1116"
-              strokeWidth="3.5"
+              stroke="#FFFFFF"
+              strokeWidth="2.75"
               fill="transparent"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
@@ -69,27 +90,34 @@ export default function LessonCard({
             />
           </svg>
 
-          {/* Centered Artwork or Icon */}
-          <div className="absolute inset-0 flex items-center justify-center p-1.5">
-            {artType ? (
-              <ClayArt type={artType} size={28} />
-            ) : Icon ? (
-              <Icon size={20} className="text-[#0E1116]" />
-            ) : null}
+          {/* Centered minimalist white icon */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            {renderIcon()}
           </div>
         </div>
 
-        {/* Mini Percentage Badge */}
-        <span className="px-2 py-0.5 rounded-full bg-white/70 text-[10px] font-bold text-[#0E1116] shadow-2xs">
+        {/* Minimalist Apple Translucent Percentage Pill */}
+        <span className="px-2.5 py-0.5 rounded-full bg-white/[0.08] border border-white/10 text-[10px] font-mono font-medium text-white/90 backdrop-blur-md">
           {progress}%
         </span>
       </div>
 
-      <div>
-        <h3 className="text-base sm:text-lg font-bold text-[#0E1116] leading-snug tracking-tight">
+      {/* Content Area */}
+      <div className="relative z-10 w-full">
+        <h3 className="text-base sm:text-lg font-bold text-white leading-snug tracking-tight group-hover:text-white transition-colors line-clamp-2">
           {title}
         </h3>
-        <p className="text-xs font-semibold text-[#3D4652] mt-0.5 opacity-90">{subtitle}</p>
+        <p className="text-xs font-normal text-white/60 mt-1 line-clamp-1 leading-relaxed">
+          {subtitle}
+        </p>
+
+        {/* Subtle Apple progress indicator bar at bottom */}
+        <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden mt-3">
+          <div
+            className="h-full bg-white rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
       </div>
     </button>
   );

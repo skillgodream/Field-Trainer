@@ -24,27 +24,27 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
   });
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto px-6 pt-4 pb-28">
+    <div className="flex-1 flex flex-col overflow-y-auto px-5 pt-4 pb-28 text-white relative z-10 animate-in fade-in duration-200">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[#0E1116] tracking-tight">Lesson Library</h1>
-        <p className="text-sm font-semibold text-[#66726B] mt-1">
+        <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Lesson Library</h1>
+        <p className="text-sm font-normal text-white/60 mt-1">
           Complete warehouse curriculum & drills
         </p>
       </div>
 
-      {/* Search Input Bar */}
-      <div className="relative mb-5">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#66726B]" />
+      {/* Apple Spotlight Style Search Bar */}
+      <div className="relative mb-5 group">
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-white transition-colors" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search lessons, tools, or procedures..."
-          className="w-full h-13 pl-11 pr-4 rounded-full bg-white border border-[#E6E8EC] text-sm font-semibold text-[#0E1116] placeholder:text-[#66726B] focus:outline-none focus:border-[#0E1116] shadow-sm"
+          className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.09] focus:bg-white/[0.12] border border-white/10 focus:border-white/30 text-sm font-medium text-white placeholder:text-white/40 focus:outline-none backdrop-blur-xl shadow-inner transition-all"
         />
       </div>
 
-      {/* Category Filter Chips */}
+      {/* Apple Segmented Control / Filter Tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1 no-scrollbar">
         {categories.map((cat) => {
           const isActive = activeCategory === cat;
@@ -55,10 +55,10 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
                 sounds.playTap();
                 setActiveCategory(cat);
               }}
-              className={`px-4 py-2 rounded-full text-xs font-bold shrink-0 transition-all active:scale-95 ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold shrink-0 transition-all duration-200 active:scale-95 cursor-pointer backdrop-blur-md ${
                 isActive
-                  ? 'bg-[#0E1116] text-white shadow-md'
-                  : 'bg-white text-[#3D4652] border border-[#E6E8EC] hover:bg-slate-50'
+                  ? 'bg-white text-black shadow-[0_4px_14px_rgba(255,255,255,0.25)] font-bold'
+                  : 'bg-white/[0.06] text-white/70 hover:text-white hover:bg-white/10 border border-white/[0.08]'
               }`}
             >
               {cat}
@@ -67,9 +67,9 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
         })}
       </div>
 
-      {/* Results Grid */}
+      {/* Results Grid with Apple Theme Cards */}
       {filteredLessons.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
           {filteredLessons.map((lesson) => (
             <LessonCard
               key={lesson.id}
@@ -86,10 +86,10 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-3xl border border-[#E6E8EC] p-6">
-          <Sparkles className="mx-auto text-slate-400 mb-2" size={32} />
-          <p className="text-base font-bold text-[#0E1116]">No lessons found</p>
-          <p className="text-xs text-[#66726B] mt-1">Try another search term or select "All"</p>
+        <div className="text-center py-16 bg-white/[0.04] backdrop-blur-2xl rounded-3xl border border-white/10 p-6">
+          <Sparkles className="mx-auto text-white/40 mb-3" size={32} />
+          <p className="text-base font-bold text-white">No lessons found</p>
+          <p className="text-xs text-white/50 mt-1">Try another search term or select "All"</p>
         </div>
       )}
     </div>

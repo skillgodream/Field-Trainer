@@ -58,7 +58,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* 2. Primary SOP Ingestion Actions (2 Prominent Cards) */}
       <div className="space-y-2">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-white/50 px-1">
           Create Lesson from Document
         </h2>
 
@@ -69,15 +69,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               sounds.playTap();
               onScanClick();
             }}
-            className="group relative flex flex-col items-start p-4 bg-white rounded-2xl border-2 border-slate-200 hover:border-slate-900 shadow-sm active:scale-98 transition-all text-left cursor-pointer"
+            className="group relative flex flex-col items-start p-4 bg-[#0E1017]/85 hover:bg-[#151923]/95 backdrop-blur-xl rounded-2xl border border-white/[0.08] hover:border-white/20 shadow-md active:scale-98 transition-all text-left cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center mb-3 shadow-md group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center mb-3 border border-white/10 shadow-sm group-hover:scale-105 transition-transform">
               <Camera size={20} />
             </div>
-            <span className="text-sm font-bold text-slate-900 leading-tight">
+            <span className="text-sm font-bold text-white leading-tight">
               Scan SOP
             </span>
-            <span className="text-[11px] text-slate-500 font-medium mt-0.5">
+            <span className="text-[11px] text-white/50 font-normal mt-0.5">
               Camera / OCR Text
             </span>
           </button>
@@ -88,15 +88,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               sounds.playTap();
               onUploadClick();
             }}
-            className="group relative flex flex-col items-start p-4 bg-indigo-600 text-white rounded-2xl border-2 border-indigo-700 shadow-md hover:bg-indigo-700 active:scale-98 transition-all text-left cursor-pointer"
+            className="group relative flex flex-col items-start p-4 bg-[#0E1017]/85 hover:bg-[#151923]/95 backdrop-blur-xl rounded-2xl border border-white/[0.08] hover:border-white/20 shadow-md active:scale-98 transition-all text-left cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center mb-3 backdrop-blur-sm group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center mb-3 border border-white/10 shadow-sm group-hover:scale-105 transition-transform">
               <Upload size={20} />
             </div>
             <span className="text-sm font-bold text-white leading-tight">
               Upload SOP
             </span>
-            <span className="text-[11px] text-indigo-100 font-medium mt-0.5">
+            <span className="text-[11px] text-white/50 font-normal mt-0.5">
               PDF, Word, Text
             </span>
           </button>
@@ -106,7 +106,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* 3. Verified Domain SOPs List */}
       <div className="space-y-3 pt-1">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-white/50">
             Verified Domain SOPs
           </h2>
           <button
@@ -114,7 +114,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               sounds.playTap();
               onExploreLibrary();
             }}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold text-white/70 hover:text-white flex items-center gap-1 cursor-pointer"
           >
             <span>View All</span>
             <ArrowRight size={12} />
@@ -129,31 +129,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 sounds.playTap();
                 onSelectSop(lesson.id, lesson.title);
               }}
-              className="group flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-slate-400 active:scale-[0.99] transition-all cursor-pointer"
+              className="group flex items-center justify-between p-4 bg-[#0E1017]/80 hover:bg-[#151923]/90 backdrop-blur-xl rounded-2xl border border-white/[0.08] hover:border-white/20 shadow-md active:scale-[0.99] transition-all cursor-pointer"
             >
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 font-black text-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/10 text-white flex items-center justify-center shrink-0 font-black text-sm group-hover:scale-105 transition-transform">
                   <FileText size={20} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-white/10 text-white/80 border border-white/10">
                       {lesson.category}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-400">
+                    <span className="text-[10px] font-normal text-white/50">
                       {lesson.stepsCount || 6} Steps
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 truncate mt-0.5">
+                  <h3 className="text-sm font-bold text-white truncate mt-0.5">
                     {lesson.title}
                   </h3>
-                  <p className="text-xs text-slate-500 truncate mt-0.2">
+                  <p className="text-xs text-white/50 truncate mt-0.5">
                     {lesson.subtitle || lesson.description}
                   </p>
                 </div>
               </div>
 
-              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 group-hover:bg-slate-900 group-hover:text-white transition-all ml-2">
+              <div className="w-8 h-8 rounded-full bg-white/10 border border-white/10 text-white flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-all ml-2">
                 <ArrowRight size={14} />
               </div>
             </div>
@@ -167,18 +167,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           sounds.playTap();
           onOpenPassport();
         }}
-        className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-200 flex items-center justify-between cursor-pointer hover:border-amber-300 transition-all shadow-xs"
+        className="p-4 bg-[#0E1017]/80 hover:bg-[#151923]/90 backdrop-blur-xl rounded-2xl border border-white/[0.08] flex items-center justify-between cursor-pointer hover:border-white/20 transition-all shadow-md"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 text-amber-400 flex items-center justify-center font-bold">
             <ShieldCheck size={20} />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-slate-900">Process Passport Audit</h4>
-            <p className="text-[11px] text-slate-600">Review operational controls & safety rules</p>
+            <h4 className="text-xs font-bold text-white">Process Passport Audit</h4>
+            <p className="text-[11px] text-white/50">Review operational controls & safety rules</p>
           </div>
         </div>
-        <span className="text-xs font-bold text-amber-700 underline">Review</span>
+        <span className="text-xs font-semibold text-white/80 bg-white/10 px-3 py-1 rounded-full border border-white/10">
+          Review →
+        </span>
       </div>
     </div>
   );

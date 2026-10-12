@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ArrowRight, BookOpen, Play, Bookmark, FileText, Compass, Award, Film, Sparkles } from 'lucide-react';
+import { ChevronLeft, BookOpen, Bookmark } from 'lucide-react';
 import { Lesson } from '../types';
 import { sounds } from '../utils/audio';
 
@@ -82,51 +82,92 @@ export default function LessonOverview({
   const learningPath = [
     {
       id: 'training-deck',
-      title: 'Training deck',
-      modeTag: 'TEACHING DECK',
-      desc: 'Explain the SOP & process in simple presentation format',
-      duration: '2 min',
-      icon: BookOpen,
+      title: 'Learn the flow',
+      subtitle: 'Interactive workflow',
       action: () => onOpenIntroDeck(),
-      illustration: (
-        <BookOpen size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
-      )
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-7 h-7 text-white"
+        >
+          <circle cx="12" cy="5" r="2.5" />
+          <circle cx="6" cy="18" r="2.5" />
+          <circle cx="18" cy="18" r="2.5" />
+          <path d="M12 7.5v3.5" />
+          <path d="M12 11c0 3-6 3.5-6 4.5" />
+          <path d="M12 11c0 3 6 3.5 6 4.5" />
+        </svg>
+      ),
     },
     {
       id: 'show-me',
-      title: 'Show Me',
-      modeTag: 'AI VIDEO DEMO',
-      desc: 'Watch photorealistic AI video demonstration of the SOP steps',
-      duration: '1-3 min',
-      icon: Film,
-      action: () => onOpenVideoDemo ? onOpenVideoDemo() : onStartSimulation(0),
-      illustration: (
-        <Film size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
-      )
+      title: 'See the action',
+      subtitle: 'Visual walkthrough',
+      action: () => (onOpenVideoDemo ? onOpenVideoDemo() : onStartSimulation(0)),
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-7 h-7 text-white"
+        >
+          <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+          <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+          <path d="M3 17v2a2 2 0 0 0 2 2h2" />
+          <path d="M17 21h2a2 2 0 0 0 2-2v-2" />
+          <circle cx="12" cy="12" r="1.8" />
+          <path d="M7.5 12c1.2-2.3 3-3.3 4.5-3.3s3.3 1 4.5 3.3c-1.2 2.3-3 3.3-4.5 3.3s-3.3-1-4.5-3.3Z" />
+        </svg>
+      ),
     },
     {
       id: 'guide-me',
-      title: 'Guide Me',
-      modeTag: 'GUIDED PRACTICE',
-      desc: 'Perform the SOP with step-by-step coach hints',
-      duration: '5 min',
-      icon: Compass,
+      title: 'Make the decision',
+      subtitle: 'Interactive scenario',
       action: () => onStartSimulation(1),
-      illustration: (
-        <Compass size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
-      )
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-7 h-7 text-white"
+        >
+          <circle cx="7" cy="6" r="2.5" />
+          <circle cx="17" cy="10" r="2.5" />
+          <path d="M7 8.5v6.5a3.5 3.5 0 0 0 3.5 3.5c2 0 3.5-1.5 3.5-3.5v-2.5" />
+        </svg>
+      ),
     },
     {
       id: 'test-me',
-      title: 'Test Me',
-      modeTag: 'ASSESSMENT',
-      desc: 'Assess whether you can perform the SOP without hints',
-      duration: '2 min',
-      icon: Award,
+      title: 'Prove capability',
+      subtitle: 'Independent assessment',
       action: () => onStartSimulation(2),
-      illustration: (
-        <Award size={80} strokeWidth={0.75} className="absolute -right-2 -bottom-2 text-white/[0.08] group-hover:text-white/[0.12] transition-all duration-300 pointer-events-none" />
-      )
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-7 h-7 text-white"
+        >
+          <path d="M18 6 7 17l-5-5" />
+          <path d="m22 10-7.5 7.5L13 16" />
+        </svg>
+      ),
     },
   ];
 
@@ -210,10 +251,9 @@ export default function LessonOverview({
           </div>
         </div>
 
-        {/* 4. Interactive 2x2 Format Options Grid (matching Screenshot 1) */}
+        {/* 4. Interactive 2x2 Format Options Grid (matching attached design) */}
         <div className="grid grid-cols-2 gap-4 pt-6 mt-2 relative z-10">
           {learningPath.map((item) => {
-            const IconComponent = item.icon;
             return (
               <button
                 key={item.id}
@@ -221,30 +261,22 @@ export default function LessonOverview({
                   sounds.playTap();
                   item.action();
                 }}
-                className="relative overflow-hidden h-[180px] rounded-3xl bg-[#0D1224] border border-white/10 p-5 flex flex-col justify-between items-start text-left active:scale-[0.98] hover:border-white/25 hover:bg-[#121930] transition-all duration-300 cursor-pointer group shadow-lg"
+                className="relative overflow-hidden min-h-[195px] sm:min-h-[205px] rounded-[28px] bg-[#0E1017] border border-white/[0.08] p-6 flex flex-col justify-between items-start text-left active:scale-[0.98] hover:border-white/20 hover:bg-[#131620] transition-all duration-200 cursor-pointer group shadow-xl"
               >
-                {/* Top Row: Mini Icon Box + Circle Chevron Arrow */}
-                <div className="flex justify-between items-center w-full">
-                  <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">
-                    <IconComponent className="w-5 h-5" />
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 group-hover:text-white group-hover:bg-white/10 transition-all duration-200">
-                    <ArrowRight size={13} className="stroke-[2.5]" />
-                  </div>
+                {/* Top: Clean freestanding icon */}
+                <div className="text-white group-hover:scale-105 transition-transform duration-200">
+                  {item.icon}
                 </div>
 
-                {/* Bottom Row: Text & Pill Badge */}
-                <div className="mt-auto relative z-10">
-                  <span className="text-base font-extrabold text-white block leading-tight">
+                {/* Bottom: Title & Subtitle */}
+                <div className="mt-auto pt-5 relative z-10">
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
                     {item.title}
-                  </span>
-                  <span className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[11px] font-semibold text-slate-300 tracking-wide mt-2">
-                    {item.duration}
-                  </span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#7E8796] font-normal mt-1 leading-snug">
+                    {item.subtitle}
+                  </p>
                 </div>
-
-                {/* Custom Watermark outline at bottom-right corner */}
-                {item.illustration}
               </button>
             );
           })}
