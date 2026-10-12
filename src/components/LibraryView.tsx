@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Lesson, CategoryType } from '../types';
 import LessonCard from './LessonCard';
 import { sounds } from '../utils/audio';
@@ -24,28 +24,28 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
   });
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto px-5 pt-4 pb-28 text-white relative z-10 animate-in fade-in duration-200">
-      <div className="mb-6">
+    <div className="flex-1 flex flex-col overflow-y-auto px-4.5 sm:px-5 pt-3 pb-28 text-white relative z-10 animate-in fade-in duration-200">
+      {/* 1. Header Typography */}
+      <div className="mb-5 px-0.5">
         <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Lesson Library</h1>
-        <p className="text-sm font-normal text-white/60 mt-1">
+        <p className="text-sm font-normal text-[#8E8E93] mt-1 tracking-tight">
           Complete warehouse curriculum & drills
         </p>
       </div>
 
-      {/* Apple Spotlight Style Search Bar */}
-      <div className="relative mb-5 group">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-white transition-colors" />
+      {/* 2. Search Bar (Centered text & clean dark pill container) */}
+      <div className="mb-4">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search lessons, tools, or procedures..."
-          className="w-full h-12 pl-11 pr-4 rounded-2xl bg-white/[0.06] hover:bg-white/[0.09] focus:bg-white/[0.12] border border-white/10 focus:border-white/30 text-sm font-medium text-white placeholder:text-white/40 focus:outline-none backdrop-blur-xl shadow-inner transition-all"
+          className="w-full h-12 px-4 rounded-2xl bg-[#14161E] border border-white/[0.08] text-sm text-center font-normal text-white placeholder:text-[#636366] placeholder:text-center focus:outline-none focus:border-white/20 transition-all shadow-inner"
         />
       </div>
 
-      {/* Apple Segmented Control / Filter Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1 no-scrollbar">
+      {/* 3. Category Filter Pills */}
+      <div className="flex gap-2.5 mb-5 overflow-x-auto pb-1 no-scrollbar">
         {categories.map((cat) => {
           const isActive = activeCategory === cat;
           return (
@@ -55,10 +55,10 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
                 sounds.playTap();
                 setActiveCategory(cat);
               }}
-              className={`px-4 py-2 rounded-full text-xs font-semibold shrink-0 transition-all duration-200 active:scale-95 cursor-pointer backdrop-blur-md ${
+              className={`px-5 py-2 rounded-full text-sm shrink-0 transition-all duration-200 active:scale-95 cursor-pointer ${
                 isActive
-                  ? 'bg-white text-black shadow-[0_4px_14px_rgba(255,255,255,0.25)] font-bold'
-                  : 'bg-white/[0.06] text-white/70 hover:text-white hover:bg-white/10 border border-white/[0.08]'
+                  ? 'bg-white text-black font-semibold shadow-sm'
+                  : 'bg-[#181A22] text-[#8E8E93] hover:text-white border border-white/[0.06] font-normal'
               }`}
             >
               {cat}
@@ -67,7 +67,7 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
         })}
       </div>
 
-      {/* Results Grid with Apple Theme Cards */}
+      {/* 4. Verified 2-Column Cards Grid */}
       {filteredLessons.length > 0 ? (
         <div className="grid grid-cols-2 gap-3.5 sm:gap-4">
           {filteredLessons.map((lesson) => (
@@ -86,10 +86,10 @@ export default function LibraryView({ lessons, onSelectLesson }: LibraryViewProp
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 bg-white/[0.04] backdrop-blur-2xl rounded-3xl border border-white/10 p-6">
+        <div className="text-center py-16 bg-[#0E1016] rounded-3xl border border-white/10 p-6">
           <Sparkles className="mx-auto text-white/40 mb-3" size={32} />
           <p className="text-base font-bold text-white">No lessons found</p>
-          <p className="text-xs text-white/50 mt-1">Try another search term or select "All"</p>
+          <p className="text-xs text-[#8E8E93] mt-1">Try another search term or select "All"</p>
         </div>
       )}
     </div>

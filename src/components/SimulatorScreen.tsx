@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Sparkles, BookOpen } from 'lucide-react';
+import { 
+  Check, 
+  X, 
+  ArrowLeft, 
+  Lightbulb, 
+  Award,
+  ChevronRight,
+  RotateCcw
+} from 'lucide-react';
 import { SIMULATION_STEPS, SIMULATION_STEPS_B } from '../data/lessonsData';
 import { SimulatorStep, Lesson, SourceMeta } from '../types';
 import AskTrainerModal from './AskTrainerModal';
@@ -7,10 +15,9 @@ import MicroLessonSheet from './MicroLessonSheet';
 import { sounds } from '../utils/audio';
 import { ORG_CONFIG } from '../config/orgConfig';
 import { findBestVisualMatch } from '../utils/visualLibraryMatcher';
-import './guruji-work-coach.css';
 
 interface SimulatorScreenProps {
-  initialPhase?: number; // 0: Show me (WATCH), 1: Guide me (YOUR TURN), 2: Test me (SOLO CHECK)
+  initialPhase?: number; // 0: Show me (WATCH), 1: Guide me (YOUR TURN / Make the decision), 2: Test me (SOLO CHECK)
   lesson?: Lesson;
   customSteps?: SimulatorStep[];
   sourceMeta?: SourceMeta;
@@ -41,30 +48,30 @@ export default function SimulatorScreen({
       ? lesson.stepObjects.map((so: any, idx: number) => ({
           id: idx + 1,
           title: so.title || `Step ${idx + 1}`,
-          type: 'check',
-          question: so.question || `How do you execute step ${idx + 1}?`,
+          type: 'bottle',
+          question: so.question || `What is the compliant SOP action for step ${idx + 1}?`,
           taskTitle: lesson.title,
           taskOrder: `SOP Step ${idx + 1}`,
           taskItem: so.screen?.info || so.title,
-          targetCode: `STEP-${idx + 1}`,
+          targetCode: `1:10 RATIO`,
           targetQty: 1,
-          sku: `SOP-${idx + 1}`,
+          sku: `CHEM-SAN-10`,
           choices: (so.options && so.options.length >= 2)
             ? so.options.map((opt: any, oIdx: number) => ({
                 id: opt.id || `c${oIdx + 1}`,
                 title: opt.label || opt.text,
-                subtitle: oIdx === 0 ? 'Compliant SOP Standard' : 'Non-compliant Action',
+                subtitle: oIdx === 0 ? 'Standard hospital-grade dilution specification' : 'Non-compliant action',
                 isCorrect: opt.id === so.correct || oIdx === 0,
               }))
             : [
-                { id: 'c1', title: so.title || 'Execute compliant SOP step', subtitle: `${lesson.title} Standard Procedure`, isCorrect: true },
-                { id: 'c2', title: `Skip step ${idx + 1} to save time`, subtitle: 'Non-compliant Shortcut', isCorrect: false },
-                { id: 'c3', title: `Bypass verification check`, subtitle: 'Unapproved Workaround', isCorrect: false },
+                { id: 'c1', title: '1:10 Standard Sanitizer Ratio', subtitle: 'Standard hospital-grade dilution specification', isCorrect: true },
+                { id: 'c2', title: '1:5 Concentrated Ratio', subtitle: 'Too concentrated, leaves toxic residue', isCorrect: false },
+                { id: 'c3', title: '1:20 Diluted Ratio', subtitle: 'Too weak, pathogen survival risk', isCorrect: false },
               ],
           why: so.why || 'Follow standard operating procedure guidelines.',
-          coachTip: so.coach_say || 'Verify required criteria before proceeding.',
+          coachTip: so.coach_say || 'Measure precisely using the standard dilution mark.',
           hint: so.hint || `Refer to ${lesson.title} written SOP`,
-          priority: 'Standard',
+          priority: 'CRITICAL',
         }))
       : initialPhase === 0
       ? SIMULATION_STEPS
@@ -81,14 +88,13 @@ export default function SimulatorScreen({
   const [missedSteps, setMissedSteps] = useState<number[]>([]);
   const [safetyMissedInTest, setSafetyMissedInTest] = useState<boolean>(false);
   
-  // Selected choice and choice interaction states
+  // Selected choice and confirmed answer state
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
+  const [isAnswerConfirmed, setIsAnswerConfirmed] = useState<boolean>(false);
   const [disabledChoiceIds, setDisabledChoiceIds] = useState<string[]>([]);
   const [coachStatus, setCoachStatus] = useState<'idle' | 'correct' | 'wrong' | 'coach'>('idle');
   const [coachSpeech, setCoachSpeech] = useState<string>('');
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const [isBubbleBad, setIsBubbleBad] = useState<boolean>(false);
-  
 
   // Modals inside simulator
   const [isTrainerModalOpen, setIsTrainerModalOpen] = useState(false);
@@ -101,46 +107,32 @@ export default function SimulatorScreen({
   }, [lesson, customSteps, initialPhase]);
 
   const step: SimulatorStep = activeStepPool[stepIndex] || activeStepPool[0];
-  const [typedQuestion, setTypedQuestion] = useState("");
-  useEffect(() => {
-    setTypedQuestion("");
-    const currentQ = step?.question || step?.title || "";
-    let i = 0;
-    const timer = setInterval(() => {
-      if (i < currentQ.length) {
-        setTypedQuestion(currentQ.substring(0, i + 1));
-        i++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 15);
-    return () => clearInterval(timer);
-  }, [stepIndex, step]);
 
   // Initialize step & phase behavior
   useEffect(() => {
     setSelectedChoiceId(null);
+    setIsAnswerConfirmed(false);
     setDisabledChoiceIds([]);
     setCoachStatus('idle');
     setHasWrongTapCurrentStep(false);
     setHintUsedCurrentStep(false);
-    setIsBubbleBad(false);
 
     if (phase === 0) {
       // SHOW ME (WATCH / Demo): Coach demonstrates, learner watches.
-      setCoachSpeech(step.why || 'Watch the demonstrated action.');
+      setCoachSpeech(step?.why || 'Watch the demonstrated action.');
       const timer = setTimeout(() => {
-        const correctChoice = step.choices.find((c) => c.isCorrect);
+        const correctChoice = step?.choices.find((c) => c.isCorrect);
         if (correctChoice) {
           setSelectedChoiceId(correctChoice.id);
+          setIsAnswerConfirmed(true);
           setCoachStatus('correct');
           sounds.playCorrect();
         }
-      }, 850);
+      }, 750);
       return () => clearTimeout(timer);
     } else if (phase === 1) {
-      // GUIDE ME (YOUR TURN): Practice with hints
-      setCoachSpeech(step.coachTip || 'I’m watching.');
+      // GUIDE ME (MAKE THE DECISION): Practice with hints
+      setCoachSpeech(step?.coachTip || 'Evaluate the situation and choose the compliant action.');
     } else {
       // TEST ME (SOLO CHECK): Solo Assessment
       setCoachSpeech('Solo Assessment: Confirm each step without hints. One attempt per line.');
@@ -153,13 +145,27 @@ export default function SimulatorScreen({
     sounds.playWrong();
   };
 
-  const handleChoiceClick = (choiceId: string, isCorrect: boolean) => {
+  const handleSelectChoice = (choiceId: string) => {
     if (disabledChoiceIds.includes(choiceId)) return;
-    if (selectedChoiceId && phase === 2) return; // In Test Me, strict one attempt
+    if (isAnswerConfirmed && coachStatus === 'correct') return; // already solved
 
+    sounds.playTap();
     setSelectedChoiceId(choiceId);
+    // If previously marked wrong, reset confirmation state so user can confirm new choice
+    if (coachStatus === 'wrong') {
+      setIsAnswerConfirmed(false);
+      setCoachStatus('idle');
+    }
+  };
 
-    if (isCorrect) {
+  const handleConfirmAnswer = () => {
+    if (!selectedChoiceId) return;
+    const choice = step.choices.find(c => c.id === selectedChoiceId);
+    if (!choice) return;
+
+    setIsAnswerConfirmed(true);
+
+    if (choice.isCorrect) {
       sounds.playCorrect();
       setCoachStatus('correct');
       setConsecutiveWrongTaps(0);
@@ -176,13 +182,10 @@ export default function SimulatorScreen({
         setScore((prev) => prev + 15);
       }
 
-      setCoachSpeech(phase === 2 ? 'Done.' : step.why || 'Correct! Proceed to next step.');
+      setCoachSpeech(phase === 2 ? 'Step verified compliant.' : step.why || 'Correct! Dilution specification verified.');
     } else {
       sounds.playWrong();
       setCoachStatus('wrong');
-      setIsBubbleBad(true);
-      setTimeout(() => setIsBubbleBad(false), 600);
-
       setHasWrongTapCurrentStep(true);
       const nextConsecutiveWrong = consecutiveWrongTaps + 1;
       setConsecutiveWrongTaps(nextConsecutiveWrong);
@@ -190,8 +193,8 @@ export default function SimulatorScreen({
       const isSafetyOrComplianceStep =
         step.type === 'scan' ||
         step.type === 'shortage' ||
-        step.title.toLowerCase().includes('safety') ||
-        step.title.toLowerCase().includes('short');
+        step.title?.toLowerCase().includes('safety') ||
+        step.priority?.toLowerCase().includes('crit');
 
       if (isSafetyOrComplianceStep) {
         setSafetyMissedInTest(true);
@@ -214,32 +217,21 @@ export default function SimulatorScreen({
       }
 
       if (phase === 1) {
-        // Build specific hint from step data or distractor context
-        let msg = 'Stop. Check the task details.';
-        if (step.type === 'location') msg = 'Look at the location code one part at a time: aisle → bay → bin.';
-        else if (step.type === 'sku') msg = 'Do not choose by appearance. Match the SKU.';
-        else if (step.type === 'qty') msg = 'The task quantity is shown above. Confirm the exact number.';
-        else if (step.type === 'shortage') msg = 'Pick what is physically there, then report the shortage.';
-        else if (step.type === 'tote') msg = 'Match the tote to the order number. Do not mix orders.';
-        else if (step.hint) msg = `Not quite. ${step.hint}`;
-
+        let msg = step.hint ? `Not quite. ${step.hint}` : 'Not compliant with SOP standard. Review dilution requirements.';
         setCoachSpeech(msg);
-        setDisabledChoiceIds((prev) => [...prev, choiceId]);
-        setTimeout(() => {
-          setSelectedChoiceId(null);
-        }, 1200);
+        setDisabledChoiceIds((prev) => [...prev, choice.id]);
       } else {
-        setCoachSpeech(`No hint in solo check. The correct action was: ${step.why}`);
+        setCoachSpeech(`Solo check incorrect. Standard SOP specification: ${step.why}`);
       }
     }
   };
 
-  const handleShowMe = () => {
+  const handleShowHint = () => {
     sounds.playTap();
     setHintUsedCurrentStep(true);
     setCoachStatus('coach');
-    setCoachSpeech(step.why || 'Check the task requirements above.');
-    sounds.speak(step.why || 'Check task requirements');
+    setCoachSpeech(step.hint || step.why || 'Review the target ratio and SKU on the card above.');
+    sounds.speak(step.hint || step.why || 'Check task requirements');
   };
 
   const handleNextStep = () => {
@@ -249,10 +241,7 @@ export default function SimulatorScreen({
     } else {
       sounds.playCorrect();
       setIsCompleted(true);
-      if (phase === 2) {
-        onFinish(score);
-        sounds.playFanfare();
-      }
+      onFinish(score);
     }
   };
 
@@ -265,145 +254,132 @@ export default function SimulatorScreen({
     }
   };
 
-  const handleRestartFull = (targetPhase: number = 1) => {
+  const handleRestartFull = (targetPhase: number) => {
     sounds.playTap();
     setPhase(targetPhase);
-    setActiveStepPool(derivedSteps);
     setStepIndex(0);
-    setScore(0);
-    setMissedSteps([]);
     setIsCompleted(false);
+    setSelectedChoiceId(null);
+    setIsAnswerConfirmed(false);
+    setDisabledChoiceIds([]);
+    setMissedSteps([]);
+    setCoachStatus('idle');
   };
 
-  // Helper icon map
-  const getStepIcon = (type: string, priority?: string) => {
-    const map: Record<string, string> = {
-      menu: '▣',
-      orders: '≡',
-      location: '⌖',
-      scan: '⌕',
-      sku: '◇',
-      qty: '#',
-      shortage: '!',
-      tote: '▤',
-      handover: '→',
-      bottle: '🧴',
-      spray: '🚿',
-      wipe: '🧹',
-      safety: '🛡️',
-      check: '✓',
-    };
-    return map[type?.toLowerCase()] || (priority?.toLowerCase().includes('crit') ? '!' : '▣');
+  // Helper icon for task
+  const getTaskIcon = () => {
+    if (step?.type === 'bottle' || step?.title?.toLowerCase().includes('sanitizer') || step?.title?.toLowerCase().includes('dilut')) {
+      return '🧴';
+    }
+    if (step?.type === 'wipe' || step?.title?.toLowerCase().includes('wipe')) {
+      return '🧹';
+    }
+    if (step?.type === 'spray' || step?.title?.toLowerCase().includes('spray')) {
+      return '🚿';
+    }
+    if (step?.type === 'location') return '📍';
+    if (step?.type === 'scan') return '🔍';
+    return '🧴';
   };
 
-  // Visual slot renderer (Domain-Aware Cards + Smart Visual Photo Library Matcher)
+  // Visual slot renderer
   const renderVisualSlot = (currentStep: SimulatorStep) => {
     const textContext = `${currentStep.title} ${currentStep.question} ${currentStep.why || ""} ${currentStep.taskTitle || ""} ${currentStep.taskItem || ""}`;
     const overallContext = `${lesson?.title || ""} ${lesson?.category || ""} ${lesson?.description || ""}`;
     const { url } = findBestVisualMatch(textContext, overallContext);
+    if (!url) return null;
+
     return (
-      <div className="w-full flex flex-col gap-3 mb-4">
-        {url ? (
-          <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-800 shadow-lg bg-slate-950 shrink-0">
-            <img src={url} alt={currentStep.title} className="w-full h-full object-cover" />
+      <div className="w-full flex flex-col gap-2 mb-4">
+        <div className="relative w-full h-40 sm:h-44 rounded-2xl overflow-hidden border border-white/10 shadow-xl bg-slate-950 shrink-0">
+          <img
+            src={url}
+            alt={currentStep.title}
+            className="w-full h-full object-cover opacity-85"
+            onError={(e) => {
+              const parent = e.currentTarget.closest('.relative')?.parentElement;
+              if (parent) parent.style.display = 'none';
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+          <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-xs text-white/90">
+            <span className="font-semibold px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-[11px]">
+              SOP Reference View
+            </span>
+            <span className="text-[11px] text-white/70">Visual Standard</span>
           </div>
-        ) : null}
+        </div>
       </div>
     );
   };
 
-  // Phase Title Helper
-  const getPhaseTitle = (p: number) => {
-    if (p === 0) return 'WATCH';
-    if (p === 1) return 'YOUR TURN';
-    return 'SOLO CHECK';
-  };
-
-  const categoryName = lesson?.category || 'SOP';
-
-  // Completion Assessment Screen (Screenshot 4)
+  // Completion Assessment Screen
   if (isCompleted) {
     const totalStepsCount = activeStepPool.length;
     const firstTimeCorrectCount = Math.max(0, totalStepsCount - missedSteps.length);
     const accuracyPct = Math.round((firstTimeCorrectCount / totalStepsCount) * 100);
     const isReady = firstTimeCorrectCount >= Math.ceil(totalStepsCount * 0.8) && !safetyMissedInTest;
 
-    const missedStepItems = activeStepPool.filter((_, idx) => missedSteps.includes(idx));
-
     return (
-      <div className="fixed inset-0 z-50 bg-[#1b1b1c] overflow-y-auto guruji-coach-wrapper">
-        <div className="guruji-coach-app">
+      <div className="fixed inset-0 z-50 bg-[#07090E] text-white overflow-y-auto overscroll-contain flex flex-col font-sans select-none">
+        <div className="max-w-md mx-auto w-full min-h-screen flex flex-col px-4 sm:px-5 py-6 relative z-10">
           {/* Header */}
-          <header className="header">
-            <div className="brand">GURUJI · WORK COACH</div>
-            <div className="live">
-              <i></i>RESULT
+          <header className="flex items-center justify-between pb-5 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-blue-400" />
+              <span className="text-xs font-bold tracking-widest uppercase text-white/80">
+                GURUJI · WORK COACH
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-xs font-bold text-blue-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              COMPLETED
             </div>
           </header>
 
-          <main className="report">
-            {/* Readiness Card */}
-            <div className="readiness">
-              <span className={`readyPill ${isReady ? '' : 'coaching'}`}>
-                {isReady ? 'READY FOR THE FLOOR' : 'COACHING NEEDED'}
-              </span>
-              <div className="score">
-                {firstTimeCorrectCount}
-                <span> / {totalStepsCount} first-time correct</span>
-              </div>
-              <div className="metrics">
-                <div className="metric">
-                  <small>Accuracy</small>
-                  <b>{accuracyPct}%</b>
+          <main className="flex-1 flex flex-col justify-between py-6 space-y-6">
+            <div className="bg-[#101524] border border-blue-500/30 rounded-[28px] p-6 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-3xl">🎯</span>
+                <div>
+                  <h3 className="text-xl font-black text-white">
+                    {isReady ? 'Floor Certified' : 'Review Needed'}
+                  </h3>
+                  <p className="text-xs text-white/60">
+                    {isReady ? 'Ready for independent shift execution' : 'Practice key points to reach 100% compliance'}
+                  </p>
                 </div>
-                <div className="metric">
-                  <small>Support</small>
-                  <b>{missedSteps.length ? `${missedSteps.length} steps` : 'None'}</b>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/10">
+                <div className="bg-black/30 rounded-2xl p-3 border border-white/5">
+                  <div className="text-[10px] uppercase font-bold text-white/50">Score</div>
+                  <div className="text-xl font-black text-white">{score} pts</div>
+                </div>
+                <div className="bg-black/30 rounded-2xl p-3 border border-white/5">
+                  <div className="text-[10px] uppercase font-bold text-white/50">Accuracy</div>
+                  <div className="text-xl font-black text-emerald-400">{accuracyPct}%</div>
                 </div>
               </div>
             </div>
 
-            {/* Focus List */}
-            <div className="fix">
-              <h3>{missedSteps.length ? 'Focus before the next shift' : 'Strong work'}</h3>
-              {missedSteps.length > 0 ? (
-                missedStepItems.map((ms, idx) => (
-                  <div className="fixRow" key={idx}>
-                    <b>{ms.title}</b>
-                    <span>{ms.why}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="fixRow">
-                  <b>Independent Execution</b>
-                  <span>You completed all critical operational decisions without intervention.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="introActions">
-              {phase === 0 ? (
-                <button className="primary" onClick={() => handleRestartFull(1)}>
-                  Continue to Guide Me →
-                </button>
-              ) : phase === 1 ? (
-                <button className="primary" onClick={() => handleRestartFull(2)}>
-                  Continue to Test Me →
-                </button>
-              ) : (
-                <button className="secondary" onClick={() => handleRestartFull(1)}>
-                  Run again
-                </button>
-              )}
+            <div className="flex flex-col gap-3">
               <button
-                className={phase === 0 ? 'secondary' : 'primary'}
+                onClick={() => handleRestartFull(1)}
+                className="w-full py-4 px-6 rounded-2xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm shadow-xl shadow-blue-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Practice Again
+              </button>
+              <button
                 onClick={() => {
                   sounds.playTap();
                   onClose();
                 }}
+                className="w-full py-3.5 px-6 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-semibold text-sm transition-all"
               >
-                Back to overview
+                Back to Lesson Overview
               </button>
             </div>
           </main>
@@ -412,252 +388,287 @@ export default function SimulatorScreen({
     );
   }
 
-  // Task Card Values
-  const currentItemLabel = (step as any).taskTitle || step.item || step.title;
-  const currentItemSub = (step as any).taskItem || (step.sku ? `SKU ${step.sku}` : step.coachTip || 'Standard Operating Action');
-  const targetLabel = step.type === 'location' ? 'TARGET' : step.type === 'shortage' ? 'NEEDED' : step.type === 'tote' ? 'TOTE' : 'TARGET';
-  const targetVal = step.targetCode || step.location || (step.targetQty ? `${step.targetQty} Units` : 'Standard Spec');
-  const qtyVal = step.targetQty !== undefined ? String(step.targetQty) : (step.type === 'shortage' ? '2' : '✓');
-  const currentPriority = step.priority || 'EXPRESS';
-  const progressPct = ((stepIndex + 1) / activeStepPool.length) * 100;
+  // Task Values
+  const taskTitle = (step as any)?.taskTitle || 'Dilution Protocol';
+  const taskSubtitle = (step as any)?.taskItem || 'Chemical Dilution Station';
+  const targetLabel = step?.type === 'location' ? 'TARGET' : 'TARGET';
+  const targetValue = step?.targetCode || '1:10 RATIO';
+  const skuValue = `${step?.targetQty ? `${step.targetQty} BOTTLE ` : '1 BOTTLE '}${step?.sku ? `(${step.sku})` : '(CHEM-SAN-10)'}`;
+  const priorityBadge = step?.priority || 'CRITICAL';
 
-  const isNextDisabled =
-    (phase === 0 && selectedChoiceId === null) ||
-    (phase === 1 && coachStatus !== 'correct') ||
-    (phase === 2 && selectedChoiceId === null);
+  // Primary action button state
+  const isCorrectlyConfirmed = isAnswerConfirmed && coachStatus === 'correct';
+  const canConfirm = selectedChoiceId !== null && (!isAnswerConfirmed || coachStatus === 'wrong');
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#1b1b1c] overflow-y-auto guruji-coach-wrapper">
-      <div className="guruji-coach-app">
-        <div className="screen work">
-          {/* Header */}
-          <header className="header">
-            <div className="brand">
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                className="back-btn"
-                aria-label="Go back to previous step"
-                title="Go back"
-              >
-                ← Back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playTap();
-                  onClose();
-                }}
-                className="cancel-btn"
-                aria-label="Cancel session"
-                title="Cancel session"
-              >
-                ✕ Cancel
-              </button>
-              <span>GURUJI · WORK COACH</span>
-            </div>
-            <div className="live">
-              <i></i>
-              {categoryName.toUpperCase()} · LIVE
-            </div>
-          </header>
+    <div className="fixed inset-0 z-50 bg-[#07090E] text-white overflow-y-auto overscroll-contain flex flex-col font-sans select-none">
+      {/* Background subtle radial ambient glow */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[500px] h-[350px] bg-blue-600/10 blur-[140px] rounded-full" />
+        <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-indigo-600/5 blur-[120px] rounded-full" />
+      </div>
 
-          {/* Progress Bar with Nodes */}
-          <div className="progress">
-            <div className="progressLine">
-              <div className="progressFill" style={{ width: `${progressPct}%` }}></div>
-            </div>
-            <div className="nodes">
-              {activeStepPool.map((_, i) => (
-                <span
-                  key={i}
-                  className={`node ${i < stepIndex ? 'done' : ''} ${i === stepIndex ? 'active' : ''}`}
-                ></span>
-              ))}
-            </div>
+      {/* Main Container - Centered Mobile Frame */}
+      <div className="max-w-md mx-auto w-full min-h-screen flex flex-col px-4 sm:px-5 pt-3 pb-36 relative z-10">
+        
+        {/* Top Navigation Bar */}
+        <header className="flex items-center justify-between py-2 mb-3">
+          <button
+            type="button"
+            onClick={handlePrevStep}
+            className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-white/90 transition-all flex items-center gap-1.5 text-xs font-semibold"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back</span>
+          </button>
+
+          <div className="text-xs font-bold text-white/70 tracking-wide uppercase">
+            Step {stepIndex + 1} of {activeStepPool.length}
           </div>
 
-          {/* Task Header & Radiant Hero Task Card */}
-          <section className="task">
-            <div className="taskMeta">
-              <span className="phase">
-                <i className="dot"></i>
-                {getPhaseTitle(phase)}
-              </span>
-              <span className="counter">
-                {String(stepIndex + 1).padStart(2, '0')} / {String(activeStepPool.length).padStart(2, '0')}
+          <button
+            type="button"
+            onClick={() => {
+              sounds.playTap();
+              onClose();
+            }}
+            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white flex items-center justify-center transition-all text-xs"
+            aria-label="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </header>
+
+        {/* 1:1 Radiant Blue Hero Task Card */}
+        <section className="mb-4">
+          <div className="bg-gradient-to-b from-[#1D4ED8] via-[#1E40AF] to-[#1E3A8A] rounded-[28px] p-5 shadow-2xl shadow-blue-900/40 border border-blue-400/30 relative overflow-hidden">
+            {/* Top Gloss Highlight */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
+
+            {/* Top Row: Amber Critical Badge */}
+            <div className="flex items-center justify-end mb-3">
+              <span className="bg-[#FBBF24] text-black font-extrabold text-[11px] px-3 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                {priorityBadge}
               </span>
             </div>
 
-            <div
-              className={`taskCard heroTask ${
-                coachStatus === 'correct'
-                  ? 'state-correct'
-                  : coachStatus === 'wrong'
-                  ? 'state-wrong'
-                  : coachStatus === 'coach'
-                  ? 'state-coach'
-                  : ''
-              }`}
-            >
-              <div className="heroInner">
-                <div className="taskHead">
-                  <div>
-                    <h2 className="taskTitle">{step.title}</h2>
-                    <div className="taskSub">
-                      {(step as any).taskOrder || lesson?.title || 'SOP'} · {step.item || step.sku || 'Standard Task'}
-                    </div>
-                  </div>
-                  <span className="priority">{currentPriority}</span>
-                </div>
-
-                <div className="item">
-                  <div className="itemIcon">{getStepIcon(step.type, step.priority)}</div>
-                  <div>
-                    <b>{currentItemLabel}</b>
-                    <span>{currentItemSub}</span>
-                  </div>
-                </div>
-
-                {step.type !== 'menu' && (
-                  <div className="target">
-                    <div className="targetBox">
-                      <label>{targetLabel}</label>
-                      <strong>{targetVal}</strong>
-                    </div>
-                    <div className="targetBox qty">
-                      <label>Qty</label>
-                      <strong>{qtyVal}</strong>
-                    </div>
-                  </div>
-                )}
-
-                
+            {/* Identity Row: Icon + Protocol Title + Subtitle */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                {getTaskIcon()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight truncate">
+                  {taskTitle}
+                </h2>
+                <p className="text-xs sm:text-sm font-medium text-blue-100/80 leading-snug truncate mt-0.5">
+                  {taskSubtitle}
+                </p>
               </div>
             </div>
-          </section>
 
-          {/* Action Section */}
-          <section className="action">
-            {renderVisualSlot(step)}
+            {/* Spec Tiles Grid: Target + SKU / Quantity */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Target Tile */}
+              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-blue-200/90 flex items-center gap-1 mb-1">
+                  <span>🎯</span>
+                  <span>{targetLabel}</span>
+                </div>
+                <div className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                  {targetValue}
+                </div>
+              </div>
 
-            <h3 className="question">{typedQuestion}</h3>
-
-            {/* Choices Grid */}
-            <div className="choices">
-              {step.choices.map((choice, index) => {
-                const isSelected = selectedChoiceId === choice.id;
-                const isDisabled = disabledChoiceIds.includes(choice.id);
-
-                let choiceStateClass = '';
-                if (isSelected) {
-                  choiceStateClass = choice.isCorrect ? 'correct' : 'wrong';
-                } else if (isDisabled) {
-                  choiceStateClass = 'disabled';
-                }
-
-                return (
-                  <button
-                    key={choice.id}
-                    style={{
-                      animation: "fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                      animationDelay: `${index * 120}ms`,
-                      opacity: 0
-                    }}
-                    className={`choice ${choiceStateClass}`.trim()}
-                    onClick={() => handleChoiceClick(choice.id, choice.isCorrect)}
-                    disabled={
-                      phase === 0 ||
-                      isDisabled ||
-                      (selectedChoiceId !== null && phase === 2)
-                    }
-                  >
-                    <div>
-                      <strong>{choice.title}</strong>
-                      {choice.subtitle && <small>{choice.subtitle}</small>}
-                    </div>
-
-                    {isSelected && (
-                      <span className="mark">
-                        {choice.isCorrect ? '✓' : '×'}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Guruji Coaching Bubble */}
-            <div className="guru" id="guru">
-              <div className="gMark">G</div>
-              <div className={`gBubble ${isBubbleBad ? 'bad' : ''}`}>
-                <b>GURUJI</b>
-                <span>{coachSpeech}</span>
+              {/* SKU / Quantity Tile */}
+              <div className="bg-black/30 backdrop-blur-md rounded-2xl p-3 border border-white/10">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-blue-200/90 flex items-center gap-1 mb-1">
+                  <span>📦</span>
+                  <span>SKU / QUANTITY</span>
+                </div>
+                <div className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                  {skuValue}
+                </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* Bottom Action Footer */}
-          <div className="bottom">
+        {/* Visual SOP photo reference if available */}
+        {renderVisualSlot(step)}
+
+        {/* Question Heading */}
+        <section className="mb-4">
+          <div className="text-[11px] font-extrabold uppercase tracking-widest text-blue-400 mb-1.5 flex items-center justify-between">
+            <span>QUESTION {stepIndex + 1} OF {activeStepPool.length}</span>
             {phase === 1 && (
-              <button className="showMe" onClick={handleShowMe}>
-                Show me hint
+              <button
+                type="button"
+                onClick={handleShowHint}
+                className="text-amber-300 hover:text-amber-200 text-[11px] font-bold flex items-center gap-1"
+              >
+                <Lightbulb className="w-3.5 h-3.5" />
+                <span>Show Hint</span>
               </button>
             )}
+          </div>
+          <h3 className="text-lg sm:text-xl font-bold text-white leading-snug">
+            {step.question || step.title}
+          </h3>
+        </section>
 
-            <div className="bottom-controls">
+        {/* Answer Choices List */}
+        <section className="space-y-3 mb-4">
+          {step.choices.map((choice) => {
+            const isSelected = selectedChoiceId === choice.id;
+            const isDisabled = disabledChoiceIds.includes(choice.id);
+
+            // Styling states
+            let cardClasses = "bg-[#101422] border-white/10 hover:border-white/20 text-white";
+            let radioContent = (
+              <div className="w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center shrink-0 transition-colors" />
+            );
+            let badgeEl = null;
+
+            if (isSelected) {
+              if (isAnswerConfirmed) {
+                if (choice.isCorrect) {
+                  cardClasses = "bg-emerald-950/40 border-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)] ring-1 ring-emerald-500/50";
+                  radioContent = (
+                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  );
+                  badgeEl = (
+                    <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                      Correct
+                    </span>
+                  );
+                } else {
+                  cardClasses = "bg-rose-950/40 border-rose-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.2)] ring-1 ring-rose-500/50";
+                  radioContent = (
+                    <div className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
+                      <X className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  );
+                  badgeEl = (
+                    <span className="bg-rose-500/20 text-rose-400 border border-rose-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                      <X className="w-3 h-3 stroke-[3]" />
+                      Not correct
+                    </span>
+                  );
+                }
+              } else {
+                // Selected but not confirmed yet
+                cardClasses = "bg-[#162038] border-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.25)] ring-1 ring-blue-500";
+                radioContent = (
+                  <div className="w-5 h-5 rounded-full border-2 border-blue-400 bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                  </div>
+                );
+              }
+            } else if (isDisabled) {
+              cardClasses = "bg-white/[0.03] border-white/5 opacity-40 cursor-not-allowed line-through";
+            }
+
+            return (
               <button
+                key={choice.id}
                 type="button"
-                className="btn-back-action"
-                onClick={handlePrevStep}
-                aria-label="Back to previous step"
+                onClick={() => handleSelectChoice(choice.id)}
+                disabled={isDisabled || (phase === 0)}
+                className={`w-full text-left p-4 sm:p-4.5 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer active:scale-[0.99] disabled:active:scale-100 ${cardClasses}`}
               >
-                ← Back
+                <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                  {radioContent}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm sm:text-base text-white leading-snug">
+                      {choice.title}
+                    </div>
+                    {choice.subtitle && (
+                      <div className="text-xs text-white/60 mt-0.5 leading-relaxed">
+                        {choice.subtitle}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {badgeEl}
               </button>
-              <button
-                type="button"
-                className="btn-cancel-action"
-                onClick={() => {
-                  sounds.playTap();
-                  onClose();
-                }}
-                aria-label="Cancel session"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="next"
-                onClick={handleNextStep}
-                disabled={isNextDisabled}
-              >
-                {stepIndex === activeStepPool.length - 1 ? 'Finish' : 'Continue →'}
-              </button>
+            );
+          })}
+        </section>
+
+        {/* Guruji Work Coach Bubble */}
+        {(coachStatus !== 'idle' || coachSpeech) && (
+          <div className="bg-[#101524]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 mb-4 flex items-start gap-3 shadow-xl">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black text-white shadow-md shrink-0">
+              G
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400 mb-0.5">
+                Guruji Work Coach
+              </div>
+              <div className="text-xs sm:text-sm text-white/90 leading-relaxed">
+                {coachSpeech}
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Integrated Trainer & Micro-lesson Modals */}
-        <AskTrainerModal
-          isOpen={isTrainerModalOpen}
-          onClose={() => setIsTrainerModalOpen(false)}
-          currentStepTitle={step.title}
-          triggerReason={autoHandoffReason || undefined}
-        />
-
-        <MicroLessonSheet
-          isOpen={isMicroLessonOpen}
-          onClose={() => setIsMicroLessonOpen(false)}
-          onOpenBasics={() => {
-            setIsMicroLessonOpen(false);
-            if (onOpenBasics) onOpenBasics();
-          }}
-          onAskTrainer={() => {
-            setIsMicroLessonOpen(false);
-            setIsTrainerModalOpen(true);
-          }}
-        />
+        )}
       </div>
+
+      {/* Bottom Sticky Action Button Dock */}
+      <div className="fixed bottom-0 inset-x-0 z-30 p-4 bg-gradient-to-t from-black via-[#07090E]/95 to-transparent pointer-events-none">
+        <div className="max-w-md mx-auto w-full pointer-events-auto flex flex-col gap-2">
+          {isCorrectlyConfirmed || phase === 0 ? (
+            <button
+              type="button"
+              onClick={handleNextStep}
+              className="w-full py-4 px-6 rounded-2xl bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] text-white font-extrabold text-base shadow-xl shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+            >
+              <span>{stepIndex === activeStepPool.length - 1 ? 'Finish Assessment' : 'Continue'}</span>
+              <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConfirmAnswer}
+              disabled={!canConfirm}
+              className={`w-full py-4 px-6 rounded-2xl font-extrabold text-base shadow-xl transition-all flex items-center justify-center gap-2 ${
+                canConfirm
+                  ? 'bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.99] text-white shadow-blue-500/30 cursor-pointer'
+                  : 'bg-white/10 text-white/35 border border-white/5 cursor-not-allowed shadow-none'
+              }`}
+            >
+              <span>Confirm Answer</span>
+              <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Integrated Trainer & Micro-lesson Modals */}
+      <AskTrainerModal
+        isOpen={isTrainerModalOpen}
+        onClose={() => setIsTrainerModalOpen(false)}
+        currentStepTitle={step?.title || 'Decision Point'}
+        triggerReason={autoHandoffReason || undefined}
+      />
+
+      <MicroLessonSheet
+        isOpen={isMicroLessonOpen}
+        onClose={() => setIsMicroLessonOpen(false)}
+        onOpenBasics={() => {
+          setIsMicroLessonOpen(false);
+          if (onOpenBasics) onOpenBasics();
+        }}
+        onAskTrainer={() => {
+          setIsMicroLessonOpen(false);
+          setIsTrainerModalOpen(true);
+        }}
+      />
     </div>
   );
 }

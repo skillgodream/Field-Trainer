@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Sliders,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShieldCheck
 } from 'lucide-react';
 import { Lesson, VideoClipPlan } from '../types';
 import { 
@@ -21,6 +22,7 @@ import {
 } from '../utils/videoCache';
 import { getApiHeaders } from '../utils/apiHelper';
 import { buildVeoPrompt } from '../utils/veoPromptBuilder';
+import { generateSimulatedVideoBlob } from '../utils/simulatedVideoGenerator';
 
 interface ShowMeVideoModalProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
   const [activeClipIndex, setActiveClipIndex] = useState(1);
   const [modalState, setModalState] = useState<ModalState>('prompt');
   const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [simulationMode, setSimulationMode] = useState<boolean>(true); // Free 0-credit test mode default
   
   // Single clip fallback prompt if no plan
   const buildDefaultPrompt = () => {
@@ -236,9 +239,28 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     return data;
   };
 
-  // Helper to run Veo generation for a single prompt
+  // Helper to run Veo or Simulated generation for a single prompt
   const generateSingleClip = async (targetPrompt: string, clipIndex: number): Promise<Blob> => {
-    // 1. Post request safely with API headers
+    // 0-CREDIT FREE SIMULATION MODE: Zero API calls, zero credit consumption
+    if (simulationMode) {
+      setGenerationStage(`Synthesizing Step ${clipIndex} demonstration clip (0 Credits)...`);
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const targetClip = isMultiClip && videoPlan?.clips
+        ? videoPlan.clips.find((c) => c.clip_index === clipIndex)
+        : undefined;
+      const blob = await generateSimulatedVideoBlob({
+        lessonTitle: lesson.title,
+        stepTitle: targetClip?.title || lesson.title,
+        stepIndex: clipIndex,
+        totalSteps: totalClips,
+        role: lesson.operationalBlueprint?.role || 'Frontline Specialist',
+        accentColor: clipIndex % 2 === 0 ? '#38BDF8' : '#34D399',
+        durationMs: 4000,
+      });
+      return blob;
+    }
+
+    // 1. Post request safely with API headers to Live Veo
     const startData = await safeFetchJson('/api/generate-video', {
       method: 'POST',
       body: JSON.stringify({
@@ -449,6 +471,54 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
           {modalState === 'prompt' && (
             <div className="flex-1 flex flex-col justify-between space-y-4">
               
+              {/* Generation Mode Selector (Free 0-Credit Simulation vs Live Veo) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/[0.04] border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${simulationMode ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                    <span className="text-xs font-semibold text-white">
+                      {simulationMode ? 'Free Simulation (0 Credits)' : 'Live Google Veo (Paid Credits)'}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setSimulationMode(true)}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        simulationMode
+                          ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      Free Test Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSimulationMode(false)}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                        !simulationMode
+                          ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      Live Veo API
+                    </button>
+                  </div>
+                </div>
+
+                {simulationMode ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs">
+                    <ShieldCheck size={16} className="shrink-0 text-emerald-400" />
+                    <span>Safe test mode active: Renders high-definition procedural demonstrations in 2s with <strong>0 credits burned</strong>.</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                    <Sparkles size={16} className="shrink-0 text-amber-400" />
+                    <span>Live Veo mode active: Requests Google Veo AI model. Consumes platform generation quota/credits.</span>
+                  </div>
+                )}
+              </div>
+
               {/* Cinematic Preview Placeholder */}
               <div className="relative aspect-video w-full rounded-xl sm:rounded-2xl overflow-hidden bg-gradient-to-b from-[#14161f] to-[#0c0d12] border border-white/10 flex flex-col items-center justify-center text-center p-6 shadow-inner">
                 <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/5">
@@ -689,12 +759,20 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-xs sm:text-sm shadow-md transition-all ${
                   videoPlan?.validation_status === 'invalid'
                     ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5'
+                    : simulationMode
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white hover:scale-[1.01] active:scale-[0.99] shadow-emerald-950/40'
                     : 'bg-blue-600 hover:bg-blue-500 text-white hover:scale-[1.01] active:scale-[0.99]'
                 }`}
                 title={videoPlan?.validation_status === 'invalid' ? 'Plan contains unresolved items requiring review before generation' : undefined}
               >
-                <Sparkles size={15} />
-                <span>{videoPlan?.validation_status === 'invalid' ? 'Review Required (Plan Invalid)' : 'Generate Video Demonstration'}</span>
+                {simulationMode ? <ShieldCheck size={16} /> : <Sparkles size={15} />}
+                <span>
+                  {videoPlan?.validation_status === 'invalid'
+                    ? 'Review Required (Plan Invalid)'
+                    : simulationMode
+                    ? 'Generate Video (0 Credits Free)'
+                    : 'Generate Live Video (Consumes Credits)'}
+                </span>
               </button>
             </>
           )}
