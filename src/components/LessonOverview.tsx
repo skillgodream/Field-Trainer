@@ -84,6 +84,7 @@ export default function LessonOverview({
       id: 'training-deck',
       title: 'Learn the flow',
       subtitle: 'Interactive workflow',
+      hoverBorder: 'hover:border-sky-500/30',
       action: () => onOpenIntroDeck(),
       icon: (
         <svg
@@ -93,7 +94,7 @@ export default function LessonOverview({
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-7 h-7 text-white"
+          className="w-7 h-7 text-sky-400 drop-shadow-[0_2px_10px_rgba(56,189,248,0.35)]"
         >
           <circle cx="12" cy="5" r="2.5" />
           <circle cx="6" cy="18" r="2.5" />
@@ -108,6 +109,7 @@ export default function LessonOverview({
       id: 'show-me',
       title: 'See the action',
       subtitle: 'Visual walkthrough',
+      hoverBorder: 'hover:border-purple-500/30',
       action: () => (onOpenVideoDemo ? onOpenVideoDemo() : onStartSimulation(0)),
       icon: (
         <svg
@@ -117,7 +119,7 @@ export default function LessonOverview({
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-7 h-7 text-white"
+          className="w-7 h-7 text-purple-400 drop-shadow-[0_2px_10px_rgba(192,132,252,0.35)]"
         >
           <path d="M3 7V5a2 2 0 0 1 2-2h2" />
           <path d="M17 3h2a2 2 0 0 1 2 2v2" />
@@ -132,6 +134,7 @@ export default function LessonOverview({
       id: 'guide-me',
       title: 'Make the decision',
       subtitle: 'Interactive scenario',
+      hoverBorder: 'hover:border-amber-500/30',
       action: () => onStartSimulation(1),
       icon: (
         <svg
@@ -141,7 +144,7 @@ export default function LessonOverview({
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-7 h-7 text-white"
+          className="w-7 h-7 text-amber-400 drop-shadow-[0_2px_10px_rgba(251,191,36,0.35)]"
         >
           <circle cx="7" cy="6" r="2.5" />
           <circle cx="17" cy="10" r="2.5" />
@@ -153,6 +156,7 @@ export default function LessonOverview({
       id: 'test-me',
       title: 'Prove capability',
       subtitle: 'Independent assessment',
+      hoverBorder: 'hover:border-emerald-500/30',
       action: () => onStartSimulation(2),
       icon: (
         <svg
@@ -162,7 +166,7 @@ export default function LessonOverview({
           strokeWidth="2.4"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-7 h-7 text-white"
+          className="w-7 h-7 text-emerald-400 drop-shadow-[0_2px_10px_rgba(52,211,153,0.35)]"
         >
           <path d="M18 6 7 17l-5-5" />
           <path d="m22 10-7.5 7.5L13 16" />
@@ -181,7 +185,7 @@ export default function LessonOverview({
 
       <div className="relative w-full flex flex-col z-10 max-w-md mx-auto">
         
-        {/* 2. Header Navigation Bar (matching Screenshot 1) */}
+        {/* 2. Header Navigation Bar */}
         <div className="flex justify-between items-center w-full relative z-10">
           <button
             onClick={() => {
@@ -219,7 +223,7 @@ export default function LessonOverview({
           </div>
         </div>
 
-        {/* 3. Hero Header Section (matching Screenshot 1) */}
+        {/* 3. Hero Header Section */}
         <div className="flex items-center justify-between gap-4 pt-8 pb-6 border-b border-white/10 relative z-10">
           <div className="flex-1 space-y-2">
             {/* Steps Count Badge */}
@@ -228,7 +232,8 @@ export default function LessonOverview({
               <span>{lesson.stepsCount} verified steps</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+            {/* Apple style gradient heading */}
+            <h1 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-[#60A5FA] via-[#C084FC] to-[#F472B6] bg-clip-text text-transparent tracking-tight leading-tight pb-0.5">
               {lesson.title}
             </h1>
 
@@ -251,7 +256,7 @@ export default function LessonOverview({
           </div>
         </div>
 
-        {/* 4. Interactive 2x2 Format Options Grid (matching attached design) */}
+        {/* 4. Interactive 2x2 Format Options Grid with subtle icon colors */}
         <div className="grid grid-cols-2 gap-4 pt-6 mt-2 relative z-10">
           {learningPath.map((item) => {
             return (
@@ -261,10 +266,10 @@ export default function LessonOverview({
                   sounds.playTap();
                   item.action();
                 }}
-                className="relative overflow-hidden min-h-[195px] sm:min-h-[205px] rounded-[28px] bg-[#0E1017] border border-white/[0.08] p-6 flex flex-col justify-between items-start text-left active:scale-[0.98] hover:border-white/20 hover:bg-[#131620] transition-all duration-200 cursor-pointer group shadow-xl"
+                className={`relative overflow-hidden min-h-[195px] sm:min-h-[205px] rounded-[28px] bg-[#0E1017] border border-white/[0.08] p-6 flex flex-col justify-between items-start text-left active:scale-[0.98] ${item.hoverBorder} hover:bg-[#131620] transition-all duration-200 cursor-pointer group shadow-xl`}
               >
-                {/* Top: Clean freestanding icon */}
-                <div className="text-white group-hover:scale-105 transition-transform duration-200">
+                {/* Top: Freestanding icon with subtle Apple color tint */}
+                <div className="group-hover:scale-105 transition-transform duration-200">
                   {item.icon}
                 </div>
 
