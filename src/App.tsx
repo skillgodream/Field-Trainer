@@ -18,6 +18,7 @@ import SimulatorScreen from './components/SimulatorScreen';
 import LibraryView from './components/LibraryView';
 import ProgressView from './components/ProgressView';
 import ProfileView from './components/ProfileView';
+import PilotDashboardView from './components/PilotDashboardView';
 import BentoArchitectureShowcase from './components/BentoArchitectureShowcase';
 import ValidationErrorModal from './components/ValidationErrorModal';
 import { MeetGurujiScreen } from './screens/MeetGurujiScreen';
@@ -250,8 +251,12 @@ export default function App() {
         confirmationText: extractedDoc.confirmationText,
         filename: extractedDoc.filename,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('[SOP Pipeline ERROR]:', err);
+      setValidationError({
+        filename: extractedDoc.filename,
+        reason: `Failed to process document: ${err?.message || 'Processing error'}`,
+      });
     } finally {
       setIsProcessing(false);
       isPipelineProcessingRef.current = false;
@@ -522,6 +527,17 @@ export default function App() {
             </main>
           )}
 
+          {activeTab === 'pilot' && (
+            <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full animate-in fade-in duration-200">
+              <PilotDashboardView
+                onBackToHome={() => setActiveTab('home')}
+                onSelectLearnerSop={(learner) => {
+                  handleSelectSop(learner.assignedSopId, learner.assignedSopTitle);
+                }}
+              />
+            </main>
+          )}
+
           {activeTab === 'profile' && (
             <main className="flex-1 flex flex-col max-w-lg mx-auto w-full animate-in fade-in duration-200">
               <ProfileView
@@ -609,6 +625,7 @@ export default function App() {
       {/* STEP 2 (Experienced branch): 4-Question Check */}
       <ExperiencedCheckModal
         isOpen={isExperiencedCheckOpen}
+        lesson={welcomeLesson || selectedLesson}
         onClose={() => setIsExperiencedCheckOpen(false)}
         onPass={handleExperiencedCheckPass}
         onFail={handleExperiencedCheckFail}

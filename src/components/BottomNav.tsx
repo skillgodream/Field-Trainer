@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BookOpen, BarChart2, User } from 'lucide-react';
+import { Home, BookOpen, BarChart2, User, ShieldCheck } from 'lucide-react';
 import { TabType } from '../types';
 import { sounds } from '../utils/audio';
 
@@ -11,6 +11,7 @@ interface BottomNavProps {
 export default function BottomNav({ activeTab, onSelectTab }: BottomNavProps) {
   const items: { id: TabType; label: string; icon: typeof Home }[] = [
     { id: 'home', label: 'Home', icon: Home },
+    { id: 'pilot', label: 'Pilot', icon: ShieldCheck },
     { id: 'library', label: 'Library', icon: BookOpen },
     { id: 'progress', label: 'Progress', icon: BarChart2 },
     { id: 'profile', label: 'Profile', icon: User },

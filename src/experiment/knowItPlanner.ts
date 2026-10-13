@@ -105,85 +105,68 @@ interface KData {
   rawText: string;
 }
 
-/** Reads the lesson from whichever shape is available (operationalBlueprint first, then blueprint/passport). */
-function collect(lessonIn: Lesson): KData {
-  const lesson: any = lessonIn;
-  const op: any = lesson.operationalBlueprint;
-  const bp: any = lesson.blueprint;
-  const pp: any = lesson.passport?.fields;
-  const km: any = lesson.knowledgeModel;
+import { buildCanonicalTaskModel } from '../utils/canonicalTaskModel';
 
-  const topic = prettyTopic(op?.process || op?.document_identity?.doc_title || lesson.title || 'Training');
-  const role = clip(op?.role || km?.identity?.role || bp?.meta?.role || '', 60);
-  const purpose = clip(op?.purpose || lesson.description || km?.purpose || '', 220);
+/** Reads the lesson by building the Canonical Task Model (CTM) to ensure 100% source fidelity. */
+function collect(lessonIn: Lesson): KData {
+  const ctm = buildCanonicalTaskModel(lessonIn.operationalBlueprint, lessonIn, lessonIn.sourceMeta?.rawText);
+
+  const topic = prettyTopic(ctm.process || ctm.documentIdentity.docTitle || lessonIn.title || 'Training');
+  const role = clip(ctm.role, 60);
+  const purpose = clip(ctm.purpose, 220);
 
   // ---- steps
-  let steps: KStep[] = [];
-  if (Array.isArray(op?.operational_steps) && op.operational_steps.length) {
-    steps = op.operational_steps.map((s: any) => ({
-      title: s.task_title || shortTitle(s.instruction || ''),
+  const steps: KStep[] = ctm.steps
+    .map((s) => ({
+      title: s.title || shortTitle(s.instruction || ''),
       text: s.instruction || '',
-      why: s.why_it_matters,
-      tip: s.coach_tip,
-      ref: s.source?.page_or_section,
-      critical: !!s.critical_control,
-      question: s.scenario_question,
-      choices: s.choices,
-    }));
-  } else if (Array.isArray(bp?.scenarios?.watch)) {
-    steps = bp.scenarios.watch.map((s: any) => ({
-      title: s.title || shortTitle(s.taskItem || ''),
-      text: s.taskItem || s.title || '',
-      why: s.why,
+      why: s.whyItMatters,
       tip: s.coachTip,
-      ref: s.page_or_section,
-      critical: s.priority === 'High Priority',
-      question: s.question,
+      ref: s.source?.pageOrSection,
+      critical: !!s.criticalControl,
+      question: s.scenarioQuestion,
       choices: s.choices,
-    }));
-  }
-  steps = steps.filter((s) => s.text && s.text.trim().length >= 10 && !META_LINE.test(s.text.trim()));
+    }))
+    .filter((s) => s.text && s.text.trim().length >= 10 && !META_LINE.test(s.text.trim()));
 
   // ---- prerequisites & tools
   const prereqs = uniq(
-    (op?.prerequisites || [])
-      .map((p: any) => clip(p?.text, 110))
-      .filter((t: string) => t && !FILLER_PREREQ.test(t))
+    ctm.prerequisites
+      .map((p) => clip(p.text, 110))
+      .filter((t) => t && !FILLER_PREREQ.test(t))
   );
 
-  const toolsRaw: any[] = op?.tools_and_systems?.length ? op.tools_and_systems : pp?.tools || [];
   const tools = uniq(
-    toolsRaw
-      .filter((t) => t?.name && !FILLER_TOOL.test(String(t.name)))
+    ctm.toolsAndSystems
+      .filter((t) => t.name && !FILLER_TOOL.test(String(t.name)))
       .map((t) => clip(t.purpose ? `${t.name} — ${t.purpose}` : t.name, 110))
   );
 
   // ---- critical controls
-  let controls: KData['controls'] = (op?.critical_controls || [])
-    .filter((c: any) => c?.rule)
-    .map((c: any) => ({ rule: c.rule, why: FILLER_WHY.test(c.rationale || '') ? undefined : c.rationale }));
-
-  if (!controls.length && pp?.golden_rules?.length) {
-    controls = pp.golden_rules.filter((g: any) => g?.text).map((g: any) => ({ rule: g.text }));
-  }
-  if (!controls.length && op?.safety_rules?.length) {
-    controls = op.safety_rules.filter((s: any) => s?.rule).map((s: any) => ({ rule: s.rule }));
-  }
-  if (!controls.length) {
-    controls = steps.filter((s) => s.critical).map((s) => ({ rule: s.text, why: s.why }));
-  }
+  const controls: KData['controls'] = ctm.controls
+    .filter((c) => c.rule)
+    .map((c) => ({
+      rule: c.rule,
+      why: c.rationale && !FILLER_WHY.test(c.rationale) ? c.rationale : undefined,
+    }));
 
   // ---- mistakes
-  let mistakes: KData['mistakes'] = [];
-  if (op?.common_mistakes?.length) {
-    mistakes = op.common_mistakes
-      .filter((m: any) => m?.mistake)
-      .map((m: any) => ({ mistake: m.mistake, fix: m.prevention }));
-  } else if (Array.isArray(bp?.common_mistakes)) {
-    mistakes = bp.common_mistakes
-      .map((m: any) => (typeof m === 'string' ? { mistake: m } : { mistake: m?.mistake, fix: m?.prevention }))
-      .filter((m: any) => m.mistake);
-  }
+  const mistakes: KData['mistakes'] = ctm.prohibitedActions
+    .filter((m) => m.mistake)
+    .map((m) => ({ mistake: m.mistake, fix: m.prevention }));
+
+  // ---- exceptions, escalations, decisions
+  const exceptions = ctm.exceptionsAndEscalations
+    .filter((e) => e.type === 'exception' && e.trigger && e.resolutionOrAction)
+    .map((e) => ({ trigger: e.trigger, resolution: e.resolutionOrAction }));
+
+  const escalations = ctm.exceptionsAndEscalations
+    .filter((e) => e.type === 'escalation' && e.trigger && e.resolutionOrAction)
+    .map((e) => ({ situation: e.trigger, action: e.resolutionOrAction }));
+
+  const decisions = ctm.decisions
+    .filter((d) => d.situation && d.compliantAction)
+    .map((d) => ({ situation: d.situation, action: d.compliantAction }));
 
   return {
     topic,
@@ -194,16 +177,10 @@ function collect(lessonIn: Lesson): KData {
     tools,
     controls,
     mistakes,
-    exceptions: (op?.exceptions || [])
-      .filter((e: any) => e?.trigger && e?.resolution)
-      .map((e: any) => ({ trigger: e.trigger, resolution: e.resolution })),
-    escalations: (op?.escalations || [])
-      .filter((e: any) => e?.situation && e?.contact_or_action)
-      .map((e: any) => ({ situation: e.situation, action: e.contact_or_action })),
-    decisions: (op?.decision_points || [])
-      .filter((d: any) => d?.situation && (d?.action || d?.decision))
-      .map((d: any) => ({ situation: d.situation, action: d.action || d.decision })),
-    rawText: lesson.sourceMeta?.rawText || '',
+    exceptions,
+    escalations,
+    decisions,
+    rawText: ctm.rawText || lessonIn.sourceMeta?.rawText || '',
   };
 }
 

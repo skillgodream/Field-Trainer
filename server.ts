@@ -6,6 +6,12 @@ import fs from 'fs';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import { planVideoDemonstration } from './src/utils/videoPlanEngine';
+import {
+  generateImage,
+  getImageGenerationConfig,
+  setRuntimeImageProvider,
+  ImageProvider,
+} from './src/services/imageGenerationService';
 
 dotenv.config();
 
@@ -847,6 +853,94 @@ app.delete('/api/videos/:lessonId', (req, res) => {
     return res.json({ success: true, message: 'Server video storage cleared.' });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: 'Failed to delete videos.' });
+  }
+});
+
+// ==========================================
+// IMAGE GENERATION API ROUTES (FLUX.1 Schnell & Imagen 3)
+// ==========================================
+
+// Get configuration, active engine, and status
+app.get('/api/image-generation/config', (_req, res) => {
+  try {
+    const config = getImageGenerationConfig();
+    return res.json({ success: true, config });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+});
+
+// Toggle provider at runtime ('flux' | 'imagen' | 'auto')
+app.post('/api/image-generation/toggle-provider', (req, res) => {
+  try {
+    const { provider } = req.body;
+    if (provider === 'flux' || provider === 'imagen') {
+      setRuntimeImageProvider(provider);
+    } else if (provider === null || provider === 'auto' || provider === 'default') {
+      setRuntimeImageProvider(null);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid provider. Must be "flux", "imagen", or "auto".',
+      });
+    }
+    const updatedConfig = getImageGenerationConfig();
+    return res.json({ success: true, config: updatedConfig });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+});
+
+// Generate image via active provider (FLUX.1 Schnell or Imagen)
+app.post(['/api/image-generation/generate', '/api/generate-image'], async (req, res) => {
+  try {
+    const {
+      prompt,
+      role,
+      stepTitle,
+      aspectRatio = '16:9',
+      provider,
+      falApiKey,
+      geminiApiKey,
+    } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'A non-empty prompt string is required.',
+      });
+    }
+
+    const headerGeminiKey = (
+      (typeof req.headers['x-gemini-api-key'] === 'string' ? req.headers['x-gemini-api-key'] : '') ||
+      (typeof req.headers['authorization'] === 'string' ? req.headers['authorization'].replace(/^Bearer\s+/i, '') : '')
+    ).trim();
+
+    const headerFalKey = (
+      typeof req.headers['x-fal-key'] === 'string' ? req.headers['x-fal-key'] : ''
+    ).trim();
+
+    const result = await generateImage({
+      prompt,
+      role,
+      stepTitle,
+      aspectRatio,
+      provider: provider as ImageProvider | undefined,
+      geminiApiKey: geminiApiKey || headerGeminiKey || undefined,
+      falApiKey: falApiKey || headerFalKey || undefined,
+    });
+
+    if (!result.success) {
+      return res.status(result.error?.includes('not configured') ? 400 : 502).json(result);
+    }
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[Image Generation Route Error]', err);
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'Internal server error while generating image.',
+    });
   }
 });
 

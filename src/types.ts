@@ -1,4 +1,4 @@
-export type TabType = 'home' | 'library' | 'progress' | 'profile' | 'experiment';
+export type TabType = 'home' | 'library' | 'progress' | 'profile' | 'pilot' | 'experiment';
 
 export type CategoryType = 'All' | 'Picking' | 'Packing' | 'Safety' | 'Inventory';
 

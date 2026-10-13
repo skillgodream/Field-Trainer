@@ -1,3 +1,4 @@
+// server.ts
 import express from "express";
 import { GoogleGenAI, GenerateVideosOperation } from "@google/genai";
 import dotenv from "dotenv";
@@ -5,10 +6,1182 @@ import path from "path";
 import fs from "fs";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
-import { planVideoDemonstration } from "./src/utils/videoPlanEngine";
+
+// src/utils/veoPromptBuilder.ts
+function getDomainPreset(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes("posh") || lower.includes("compliance") || lower.includes("hr") || lower.includes("investigation") || lower.includes("committee") || lower.includes("legal") || lower.includes("policy") || lower.includes("complaint") || lower.includes("intake")) {
+    return {
+      environment: "executive private corporate meeting suite with frosted acoustic glass partitions, polished oak conference table, and organized file trays",
+      lighting: "diffused natural morning daylight mixed with warm commercial recessed spotlights",
+      camera: "slow cinematic right-to-left tracking dolly shot maintaining steady focal depth until the final frame"
+    };
+  }
+  if (lower.includes("phlebotom") || lower.includes("blood") || lower.includes("sample") || lower.includes("patient") || lower.includes("lab") || lower.includes("specimen") || lower.includes("clinic") || lower.includes("hospital")) {
+    return {
+      environment: "sterile clinical preparation suite with stainless steel countertops, organized specimen racks, and digital centrifuge arrays",
+      lighting: "crisp medical-grade neutral illumination with soft diffused fill",
+      camera: "steady continuous forward camera drift gliding smoothly along the clinical preparation bench"
+    };
+  }
+  if (lower.includes("retail") || lower.includes("cashier") || lower.includes("store") || lower.includes("checkout") || lower.includes("pos") || lower.includes("customer") || lower.includes("barcode")) {
+    return {
+      environment: "modern organized retail point-of-sale checkout counter with barcode scanner cradle and clean product shelving displays",
+      lighting: "bright commercial overhead lighting balanced by warm ambient store glow",
+      camera: "slow cinematic lateral tracking shot moving steadily across the checkout area"
+    };
+  }
+  if (lower.includes("pick") || lower.includes("pack") || lower.includes("warehouse") || lower.includes("tote") || lower.includes("inventory") || lower.includes("logistics") || lower.includes("wms")) {
+    return {
+      environment: "well-lit fulfillment center staging aisle with high-bay metal racking, yellow safety bollards, and organized staging bins",
+      lighting: "even industrial high-bay LED illumination with clean directional contrast",
+      camera: "smooth continuous forward dolly shot gliding steadily down the aisle"
+    };
+  }
+  if (lower.includes("hotel") || lower.includes("housekeep") || lower.includes("guest") || lower.includes("room") || lower.includes("linen") || lower.includes("suite")) {
+    return {
+      environment: "contemporary premium hospitality suite with tailored wood millwork, linen preparation station, and pristine surfaces",
+      lighting: "warm ambient sunlight filtered through sheer curtains with warm architectural accents",
+      camera: "slow cinematic lateral panning shot drifting smoothly across the room"
+    };
+  }
+  return {
+    environment: "modern professional operational facility with organized workstations, safety signage, and equipment staging bays",
+    lighting: "clean commercial studio illumination with balanced soft natural daylight",
+    camera: "subtle continuous camera tracking shot gliding steadily forward"
+  };
+}
+function toContinuousAction(rawAction) {
+  let clean = rawAction.trim().replace(/^Step \d+:\s*/i, "");
+  clean = clean.replace(/^(please|ensure to|make sure to|always|must|should|verify that|check that)\s+/i, "");
+  clean = clean.replace(/\b(close[s]?|shut[s]?)\s+the\s+laptop\b/gi, "keeping the laptop open as operational data flows").replace(/\b(press[es]?|push[es]?|hit[s]?)\s+(?:the\s+)?button\b/gi, "holding down the control button safely").replace(/\b(sit[s]?\s+down)\b/gi, "seated stationary while methodically analyzing").replace(/\b(stand[s]?\s+up)\b/gi, "standing alertly while inspecting").replace(/\b(shut[s]?\s+down|power[s]?\s+off)\b/gi, "steadily monitoring system status indicators").replace(/\b(finish[es]?|complete[s]?)\b/gi, "continuously verifying and logging final results");
+  const verbMap = {
+    receive: "receiving and cross-checking",
+    verify: "methodically verifying and examining",
+    inspect: "carefully inspecting and reviewing",
+    check: "systematically checking and confirming",
+    scan: "steadily scanning and logging",
+    record: "precisely documenting and recording",
+    review: "continuously reviewing and cross-referencing",
+    prepare: "methodically preparing and staging",
+    intake: "conducting formal intake and documenting",
+    route: "securing and routing",
+    pack: "carefully arranging and packing",
+    place: "steadily positioning and securing",
+    handle: "properly handling and managing",
+    examine: "thoroughly examining and analyzing",
+    log: "systematically logging and recording",
+    confirm: "consistently confirming and validating",
+    monitor: "continuously monitoring and observing",
+    calibrate: "slowly calibrating and adjusting"
+  };
+  const words = clean.split(/\s+/);
+  const firstWord = words[0]?.toLowerCase() || "";
+  if (verbMap[firstWord]) {
+    words[0] = verbMap[firstWord];
+    clean = words.join(" ");
+  } else if (!clean.toLowerCase().includes("ing")) {
+    clean = `steadily executing ${clean}`;
+  }
+  return clean;
+}
+function buildVeoPrompt(options) {
+  const { role = "frontline professional", process: process2 = "operational procedure", actionInstruction, criticalControl, decisionOrException } = options;
+  const contextText = `${role} ${process2} ${actionInstruction} ${criticalControl || ""} ${decisionOrException || ""}`;
+  const preset = getDomainPreset(contextText);
+  let continuousAction = toContinuousAction(actionInstruction);
+  if (criticalControl && !continuousAction.toLowerCase().includes(criticalControl.toLowerCase().slice(0, 15))) {
+    continuousAction += ` while applying critical control (${criticalControl.replace(/\.$/, "")})`;
+  } else if (decisionOrException && !continuousAction.toLowerCase().includes(decisionOrException.toLowerCase().slice(0, 15))) {
+    continuousAction += ` while executing procedure (${decisionOrException.replace(/\.$/, "")})`;
+  }
+  return `Photorealistic 720p 16:9 cinematic instructional demonstration. A frontline ${role} is ${continuousAction} with steady, continuous hand movements. The setting is a ${preset.environment}. ${preset.lighting}. ${preset.camera}.`;
+}
+
+// src/utils/videoPlanEngine.ts
+function clusterStepsIntoScenes(steps) {
+  if (!steps || steps.length === 0) return [];
+  const clusters = [];
+  if (steps.length <= 3) {
+    steps.forEach((step, idx) => {
+      clusters.push({
+        title: step.task_title || `Step ${idx + 1}`,
+        steps: [step],
+        phase: idx === 0 ? "setup_and_intake" : idx === steps.length - 1 ? "verification_and_handoff" : "core_execution"
+      });
+    });
+    return clusters;
+  }
+  let currentGroup = [];
+  let currentTitle = "";
+  let currentPhase = "setup_and_intake";
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const cat = step.category || "DO";
+    const isEscalationOrException = cat === "ESCALATE" || cat === "RECOVER" || cat === "RESPOND" || /escalat|damage|hazard|reject|incident/i.test(step.instruction);
+    const isDecisionOrControl = cat === "DECIDE" || cat === "CHECK" || step.critical_control || /verif|inspect|check|ratio|dwell/i.test(step.instruction);
+    const isFirst = i === 0;
+    const isLast = i === steps.length - 1;
+    let stepPhase = "core_execution";
+    if (isFirst || i <= 1 && /greet|arriv|intake|identif|receiv|order|book/i.test(step.instruction)) {
+      stepPhase = "setup_and_intake";
+    } else if (/prep|sanitiz|dilut|clean|station|tray|glove|swab/i.test(step.instruction)) {
+      stepPhase = "inspection_and_prep";
+    } else if (isEscalationOrException) {
+      stepPhase = "exception_and_escalation";
+    } else if (isDecisionOrControl) {
+      stepPhase = "control_and_decision";
+    } else if (isLast || /handover|sign-off|discharg|complet|log|handoff/i.test(step.instruction)) {
+      stepPhase = "verification_and_handoff";
+    }
+    if (currentGroup.length > 0) {
+      const shouldSplit = currentGroup.length >= 2 || currentPhase !== stepPhase;
+      if (shouldSplit) {
+        clusters.push({
+          title: currentTitle,
+          steps: currentGroup,
+          phase: currentPhase
+        });
+        currentGroup = [];
+      }
+    }
+    if (currentGroup.length === 0) {
+      currentPhase = stepPhase;
+      currentTitle = step.task_title || `Scene ${clusters.length + 1}: ${stepPhase.replace(/_/g, " ")}`;
+    }
+    currentGroup.push(step);
+  }
+  if (currentGroup.length > 0) {
+    clusters.push({
+      title: currentTitle,
+      steps: currentGroup,
+      phase: currentPhase
+    });
+  }
+  return clusters;
+}
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "have",
+  "must",
+  "when",
+  "then",
+  "into",
+  "after",
+  "before",
+  "should",
+  "ensure",
+  "using",
+  "under",
+  "over",
+  "each",
+  "every",
+  "will",
+  "been",
+  "being",
+  "standard",
+  "procedure",
+  "this",
+  "that",
+  "these",
+  "those",
+  "such",
+  "only",
+  "more",
+  "most",
+  "some",
+  "any",
+  "all",
+  "both",
+  "between",
+  "through",
+  "during"
+]);
+var GENERIC_WORDS = /* @__PURE__ */ new Set([
+  "patient",
+  "customer",
+  "safety",
+  "process",
+  "procedure",
+  "standard",
+  "protocol",
+  "operation",
+  "operational",
+  "frontline",
+  "service",
+  "system",
+  "action",
+  "check",
+  "ensure",
+  "verify",
+  "verifying",
+  "perform",
+  "performing",
+  "practice",
+  "guideline",
+  "compliance",
+  "compliant",
+  "requirement",
+  "require",
+  "correct",
+  "proper",
+  "appropriate",
+  "manner",
+  "method",
+  "methodical",
+  "carefully",
+  "always",
+  "never",
+  "routine",
+  "rule",
+  "rules",
+  "step",
+  "steps",
+  "item",
+  "items",
+  "work",
+  "worker",
+  "staff",
+  "employee",
+  "department",
+  "role",
+  "unit",
+  "area",
+  "room",
+  "time",
+  "date",
+  "form"
+]);
+function extractSpecificKeywords(text) {
+  if (!text) return [];
+  return text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).filter((w) => w.length >= 4 && !STOP_WORDS.has(w) && !GENERIC_WORDS.has(w));
+}
+function isProhibitiveRule(text) {
+  if (!text) return false;
+  return /\b(zero\s+tolerance|zero|never|prohibit|prohibited|forbidden|not\s+permitted|cannot|ban|banned|refuse|strictly\s+avoided|do\s+not|don't)\b/i.test(text);
+}
+function matchesStepRef(step, stepIdx, sourceRef) {
+  if (!sourceRef) return false;
+  const trimmed = sourceRef.trim();
+  const stepIdxTag = `step-${stepIdx + 1}`;
+  if (trimmed === stepIdxTag || trimmed.startsWith(`${stepIdxTag}-`)) {
+    return true;
+  }
+  const sRef = step.source?.source_ref?.trim();
+  if (sRef) {
+    if (trimmed === sRef || trimmed.startsWith(`${sRef}-`)) {
+      return true;
+    }
+  }
+  return false;
+}
+function makeLedgerItemId(type, sourceRef, idx) {
+  const cleanRef = sourceRef?.trim() || "";
+  if (cleanRef && !cleanRef.includes(" ") && cleanRef.startsWith(`${type}-`)) {
+    return cleanRef;
+  }
+  return `${type}:${cleanRef || idx + 1}`;
+}
+function findBestSceneAssociation(itemText, itemSourceRef, stepClusters, steps) {
+  if (itemSourceRef && itemSourceRef.trim().length > 0) {
+    const structuredMatches = [];
+    stepClusters.forEach((cluster, cIdx) => {
+      const hasDirectRef = cluster.steps.some((s) => matchesStepRef(s, steps.indexOf(s), itemSourceRef));
+      if (hasDirectRef) {
+        structuredMatches.push(cIdx);
+      }
+    });
+    if (structuredMatches.length > 0) {
+      return {
+        clusterIndex: structuredMatches[0],
+        matchType: "structured",
+        confidence: "high"
+      };
+    }
+  }
+  const specificItemKeywords = Array.from(new Set(extractSpecificKeywords(itemText)));
+  if (specificItemKeywords.length < 2) {
+    return null;
+  }
+  const scores = [];
+  stepClusters.forEach((cluster, cIdx) => {
+    const clusterText = `${cluster.title} ${cluster.steps.map((s) => `${s.task_title || ""} ${s.instruction}`).join(" ")}`;
+    const clusterKeywords = new Set(extractSpecificKeywords(clusterText));
+    const matchedWords = specificItemKeywords.filter((w) => clusterKeywords.has(w));
+    if (matchedWords.length >= 2) {
+      scores.push({ clusterIndex: cIdx, score: matchedWords.length, matchedWords });
+    }
+  });
+  if (scores.length === 0) {
+    return null;
+  }
+  scores.sort((a, b) => b.score - a.score);
+  if (scores.length > 1 && scores[0].score === scores[1].score) {
+    return {
+      isAmbiguous: true,
+      ambiguousCandidateIndices: scores.map((s) => s.clusterIndex),
+      matchedWords: scores[0].matchedWords
+    };
+  }
+  return {
+    clusterIndex: scores[0].clusterIndex,
+    matchType: "semantic",
+    confidence: scores[0].score >= 3 ? "high" : "medium",
+    matchedWords: scores[0].matchedWords
+  };
+}
+function planVideoDemonstration(blueprint) {
+  const steps = blueprint.operational_steps || [];
+  const controls = blueprint.critical_controls || [];
+  const decisions = blueprint.decision_points || [];
+  const exceptions = blueprint.exceptions || [];
+  const escalations = blueprint.escalations || [];
+  const safetyRules = blueprint.safety_rules || [];
+  const qualityRules = blueprint.quality_rules || [];
+  const prerequisites = blueprint.prerequisites || [];
+  const role = blueprint.role || "frontline professional";
+  const processName = blueprint.process || blueprint.document_identity?.doc_title || "Standard Operating Procedure";
+  const excludedItems = [];
+  const coverageLedger = [];
+  const unresolvedItems = [];
+  const stepClusters = clusterStepsIntoScenes(steps);
+  const plannedClips = [];
+  const claimedControlIndices = /* @__PURE__ */ new Set();
+  const claimedDecisionIndices = /* @__PURE__ */ new Set();
+  const claimedExceptionIndices = /* @__PURE__ */ new Set();
+  const claimedEscalationIndices = /* @__PURE__ */ new Set();
+  const claimedSafetyIndices = /* @__PURE__ */ new Set();
+  const claimedQualityIndices = /* @__PURE__ */ new Set();
+  const assignedControlByScene = /* @__PURE__ */ new Map();
+  const assignedDecisionByScene = /* @__PURE__ */ new Map();
+  const assignedExceptionByScene = /* @__PURE__ */ new Map();
+  const assignedEscalationByScene = /* @__PURE__ */ new Map();
+  const assignedSafetyByScene = /* @__PURE__ */ new Map();
+  const assignedQualityByScene = /* @__PURE__ */ new Map();
+  controls.forEach((ctrl, cIdx) => {
+    if (isProhibitiveRule(ctrl.rule)) return;
+    const text = `${ctrl.rule} ${ctrl.rationale || ""}`;
+    const res = findBestSceneAssociation(text, ctrl.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedControlByScene.has(res.clusterIndex)) {
+        assignedControlByScene.set(res.clusterIndex, { ctrl, index: cIdx });
+        claimedControlIndices.add(cIdx);
+      }
+    }
+  });
+  decisions.forEach((dec, dIdx) => {
+    if (!dec.situation || dec.situation.trim().length <= 3) return;
+    const text = `${dec.situation} ${dec.decision || ""}`;
+    const res = findBestSceneAssociation(text, dec.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedDecisionByScene.has(res.clusterIndex)) {
+        assignedDecisionByScene.set(res.clusterIndex, { dec, index: dIdx });
+        claimedDecisionIndices.add(dIdx);
+      }
+    }
+  });
+  exceptions.forEach((exc, eIdx) => {
+    if (!exc.trigger || exc.trigger.trim().length <= 3) return;
+    const text = `${exc.trigger} ${exc.resolution || ""}`;
+    const res = findBestSceneAssociation(text, exc.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedExceptionByScene.has(res.clusterIndex)) {
+        assignedExceptionByScene.set(res.clusterIndex, { exc, index: eIdx });
+        claimedExceptionIndices.add(eIdx);
+      }
+    }
+  });
+  escalations.forEach((esc, escIdx) => {
+    if (!esc.situation || esc.situation.trim().length <= 3) return;
+    const text = `${esc.situation} ${esc.contact_or_action || ""}`;
+    const res = findBestSceneAssociation(text, esc.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedEscalationByScene.has(res.clusterIndex)) {
+        assignedEscalationByScene.set(res.clusterIndex, { esc, index: escIdx });
+        claimedEscalationIndices.add(escIdx);
+      }
+    }
+  });
+  safetyRules.forEach((safe, sIdx) => {
+    if (!safe.rule || safe.rule.trim().length <= 3 || isProhibitiveRule(safe.rule)) return;
+    const res = findBestSceneAssociation(safe.rule, safe.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedSafetyByScene.has(res.clusterIndex)) {
+        assignedSafetyByScene.set(res.clusterIndex, { safe, index: sIdx });
+        claimedSafetyIndices.add(sIdx);
+      }
+    }
+  });
+  qualityRules.forEach((qual, qIdx) => {
+    if (!qual.rule || qual.rule.trim().length <= 3 || isProhibitiveRule(qual.rule)) return;
+    const res = findBestSceneAssociation(qual.rule, qual.source_ref, stepClusters, steps);
+    if (res && !res.isAmbiguous && res.clusterIndex !== void 0) {
+      if (!assignedQualityByScene.has(res.clusterIndex)) {
+        assignedQualityByScene.set(res.clusterIndex, { qual, index: qIdx });
+        claimedQualityIndices.add(qIdx);
+      }
+    }
+  });
+  stepClusters.forEach((cluster, clusterIdx) => {
+    const sceneIndex = clusterIdx + 1;
+    const sceneId = `scene-${sceneIndex}`;
+    const primaryStep = cluster.steps[0];
+    const coveredRefs = cluster.steps.map((s, idx) => s.source?.source_ref || `step-${steps.indexOf(s) + 1}`);
+    const combinedActions = cluster.steps.map((s) => s.instruction).join(" and ");
+    const primaryTaskTitle = cluster.steps.map((s) => s.task_title).filter(Boolean).join(" & ") || cluster.title;
+    cluster.steps.forEach((step) => {
+      const stepIdx = steps.indexOf(step);
+      const stepRef = step.source?.source_ref || `step-${stepIdx + 1}`;
+      coverageLedger.push({
+        item_id: makeLedgerItemId("step", stepRef, stepIdx),
+        item_type: "step",
+        source_ref: stepRef,
+        description: step.instruction,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Demonstrated as core procedural action in Scene ${sceneIndex}.`
+      });
+    });
+    const matchedControlObj = assignedControlByScene.get(clusterIdx);
+    const matchedControl = matchedControlObj?.ctrl;
+    if (matchedControl && matchedControlObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("control", matchedControl.source_ref, matchedControlObj.index),
+        item_type: "control",
+        source_ref: matchedControl.source_ref || `ctrl-${matchedControlObj.index + 1}`,
+        description: matchedControl.rule,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Demonstrated directly in Scene ${sceneIndex} as active procedural control.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Observed in Scene ${sceneIndex} prompt and learner observation cues.`
+      });
+    }
+    const matchedDecisionObj = assignedDecisionByScene.get(clusterIdx);
+    const matchedDecision = matchedDecisionObj?.dec;
+    if (matchedDecision && matchedDecisionObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("decision", matchedDecision.source_ref, matchedDecisionObj.index),
+        item_type: "decision",
+        source_ref: matchedDecision.source_ref || `dec-${matchedDecisionObj.index + 1}`,
+        description: matchedDecision.situation,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Illustrated in Scene ${sceneIndex} decision cue.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Demonstrated in Scene ${sceneIndex} decision cue.`
+      });
+    }
+    const matchedExceptionObj = assignedExceptionByScene.get(clusterIdx);
+    const matchedException = matchedExceptionObj?.exc;
+    if (matchedException && matchedExceptionObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("exception", matchedException.source_ref, matchedExceptionObj.index),
+        item_type: "exception",
+        source_ref: matchedException.source_ref || `exc-${matchedExceptionObj.index + 1}`,
+        description: matchedException.trigger,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Visualized in Scene ${sceneIndex} exception resolution cue.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Visualized in Scene ${sceneIndex} exception prompt and resolution cue.`
+      });
+    }
+    const matchedEscalationObj = assignedEscalationByScene.get(clusterIdx);
+    const matchedEscalation = matchedEscalationObj?.esc;
+    if (matchedEscalation && matchedEscalationObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("escalation", matchedEscalation.source_ref, matchedEscalationObj.index),
+        item_type: "escalation",
+        source_ref: matchedEscalation.source_ref || `esc-${matchedEscalationObj.index + 1}`,
+        description: matchedEscalation.situation,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Highlighted in Scene ${sceneIndex} escalation cue.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Highlighted in Scene ${sceneIndex} escalation cue.`
+      });
+    }
+    const matchedSafetyObj = assignedSafetyByScene.get(clusterIdx);
+    const matchedSafety = matchedSafetyObj?.safe;
+    if (matchedSafety && matchedSafetyObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("safety_rule", matchedSafety.source_ref, matchedSafetyObj.index),
+        item_type: "safety_rule",
+        source_ref: matchedSafety.source_ref || `safe-${matchedSafetyObj.index + 1}`,
+        description: matchedSafety.rule,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Demonstrated in Scene ${sceneIndex} procedural safety precautions.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Demonstrated in Scene ${sceneIndex} procedural safety precautions.`
+      });
+    }
+    const matchedQualityObj = assignedQualityByScene.get(clusterIdx);
+    const matchedQuality = matchedQualityObj?.qual;
+    if (matchedQuality && matchedQualityObj) {
+      coverageLedger.push({
+        item_id: makeLedgerItemId("control", matchedQuality.source_ref, matchedQualityObj.index),
+        item_type: "control",
+        source_ref: matchedQuality.source_ref || `qual-${matchedQualityObj.index + 1}`,
+        description: matchedQuality.rule,
+        disposition: "represented_in_video",
+        assigned_scene_id: sceneId,
+        assigned_scene_index: sceneIndex,
+        assigned_mode: "Show Me",
+        reason: `Demonstrated in Scene ${sceneIndex} quality execution standard.`,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: `Demonstrated in Scene ${sceneIndex} quality execution standard.`
+      });
+    }
+    const purpose = cluster.steps.length === 1 ? `Demonstrate ${cluster.steps[0].instruction}` : `Demonstrate sequential execution of ${cluster.steps[0].task_title || "initial action"} followed by ${cluster.steps[cluster.steps.length - 1].task_title || "verification"}`;
+    const criticalAction = `Frontline ${role} executes ${combinedActions}`;
+    let controlOrDecision;
+    if (matchedControl) {
+      controlOrDecision = `Critical Control: ${matchedControl.rule}`;
+    } else if (matchedDecision) {
+      controlOrDecision = `Decision Point: In situation "${matchedDecision.situation}", choose "${matchedDecision.decision}"`;
+    }
+    let exceptionOrEscalation;
+    if (matchedEscalation) {
+      exceptionOrEscalation = `Escalation: ${matchedEscalation.situation} -> ${matchedEscalation.contact_or_action}`;
+    } else if (matchedException) {
+      exceptionOrEscalation = `Exception Resolution: ${matchedException.trigger} -> ${matchedException.resolution}`;
+    }
+    let whatLearnerShouldSee = `Clear physical view of ${role} performing ${cluster.steps[0].instruction}${cluster.steps[1] ? ` and then ${cluster.steps[1].instruction}` : ""} with authentic equipment.`;
+    if (matchedControl) {
+      whatLearnerShouldSee += ` Learner explicitly observes execution of mandatory control: "${matchedControl.rule}".`;
+    }
+    if (matchedException) {
+      whatLearnerShouldSee += ` Learner explicitly observes exception management: in response to "${matchedException.trigger}", immediately "${matchedException.resolution}".`;
+    }
+    const whatLearnerShouldUnderstand = cluster.steps[0].why_it_matters || matchedControl?.rationale || `Ensures compliance with standard operational quality and safety guidelines.`;
+    const onScreenText = buildOnScreenText(cluster.steps, matchedControl?.rule, matchedEscalation?.contact_or_action);
+    const veoPrompt = buildVeoPrompt({
+      role,
+      process: processName,
+      taskTitle: primaryTaskTitle,
+      actionInstruction: combinedActions,
+      stepIndex: sceneIndex,
+      criticalControl: matchedControl?.rule,
+      decisionOrException: matchedException?.resolution || matchedDecision?.action
+    });
+    const clipDuration = 8;
+    let distinctTitle = primaryTaskTitle;
+    if (plannedClips.some((p) => p.title.toLowerCase() === distinctTitle.toLowerCase())) {
+      distinctTitle = `Scene ${sceneIndex}: ${distinctTitle}`;
+    }
+    plannedClips.push({
+      clip_index: sceneIndex,
+      scene_id: sceneId,
+      title: distinctTitle,
+      purpose,
+      step_ref: `Steps ${coveredRefs.join(", ")}`,
+      covered_step_refs: coveredRefs,
+      critical_action: criticalAction,
+      control_or_decision: controlOrDecision,
+      exception_or_escalation: exceptionOrEscalation,
+      what_the_learner_should_see: whatLearnerShouldSee,
+      what_the_learner_should_understand: whatLearnerShouldUnderstand,
+      on_screen_text: onScreenText,
+      duration_seconds: clipDuration,
+      estimated_duration_seconds: clipDuration,
+      veo_prompt: veoPrompt,
+      key_action: cluster.steps[0].instruction,
+      tool_or_hazard: cluster.steps.find((s) => s.target_code)?.target_code
+    });
+  });
+  if (plannedClips.length === 0) {
+    const defaultAction = blueprint.process || "Perform standard operational procedure";
+    plannedClips.push({
+      clip_index: 1,
+      scene_id: "scene-1",
+      title: "Operational Procedure Overview",
+      purpose: `Demonstrate ${defaultAction}`,
+      step_ref: "General Procedure",
+      covered_step_refs: ["general"],
+      critical_action: `Frontline ${role} executes ${defaultAction}`,
+      what_the_learner_should_see: `Clear physical view of ${role} demonstrating compliant technique.`,
+      what_the_learner_should_understand: `Ensures compliance with standard operational quality and safety guidelines.`,
+      on_screen_text: "EXECUTE COMPLIANT WORKPLACE PROCEDURE",
+      duration_seconds: 8,
+      estimated_duration_seconds: 8,
+      veo_prompt: buildVeoPrompt({
+        role,
+        process: processName,
+        actionInstruction: defaultAction,
+        stepIndex: 1
+      }),
+      key_action: defaultAction
+    });
+  }
+  controls.forEach((ctrl, cIdx) => {
+    if (claimedControlIndices.has(cIdx)) return;
+    const ctrlRef = ctrl.source_ref || `ctrl-${cIdx + 1}`;
+    const ledgerId = makeLedgerItemId("control", ctrl.source_ref, cIdx);
+    if (!ctrl.rule || ctrl.rule.trim().length <= 3) {
+      const reason = `Critical control has ambiguous or empty source text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: ctrlRef,
+        description: ctrl.rule || "Empty control rule",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: ctrlRef,
+        item_type: "control",
+        description: ctrl.rule || "Empty control rule",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else if (isProhibitiveRule(ctrl.rule)) {
+      const reason = `Statutory / compliance prohibition ("${ctrl.rule}") is verified via Test Me compliance check questions rather than procedural demonstration video.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: ctrlRef,
+        description: ctrl.rule,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Test Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Evaluated via Test Me compliance check questions."
+      });
+      excludedItems.push({
+        item_ref: ctrlRef,
+        item_type: "control",
+        description: ctrl.rule,
+        reason,
+        disposition: "assigned_to_test_me",
+        assigned_mode: "Test Me"
+      });
+    } else {
+      const assoc = findBestSceneAssociation(`${ctrl.rule} ${ctrl.rationale || ""}`, ctrl.source_ref, stepClusters, steps);
+      const reason = assoc?.isAmbiguous ? `Ambiguous multi-step association (candidate scenes: ${assoc.ambiguousCandidateIndices?.map((i) => i + 1).join(", ")}); routed to Guide Me scenario rather than forced video guess.` : `Quality control requirement ("${ctrl.rule}") is practiced in Guide Me simulation scenarios.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: ctrlRef,
+        description: ctrl.rule,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: assoc?.isAmbiguous ? "medium" : "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Practiced interactively in Guide Me simulation scenarios."
+      });
+      excludedItems.push({
+        item_ref: ctrlRef,
+        item_type: "control",
+        description: ctrl.rule,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  decisions.forEach((dec, dIdx) => {
+    if (claimedDecisionIndices.has(dIdx)) return;
+    const decRef = dec.source_ref || `dec-${dIdx + 1}`;
+    const ledgerId = makeLedgerItemId("decision", dec.source_ref, dIdx);
+    if (!dec.situation || dec.situation.trim().length <= 3) {
+      const reason = `Decision point has ambiguous or empty source text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "decision",
+        source_ref: decRef,
+        description: dec.situation || "Empty decision point",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: decRef,
+        item_type: "decision",
+        description: dec.situation || "Empty decision point",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else {
+      const reason = `Contingency branch dilemma ("${dec.situation}") is practiced interactively in Guide Me simulator choices rather than linear demonstration video.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "decision",
+        source_ref: decRef,
+        description: dec.situation,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Practiced interactively in Guide Me branching choices."
+      });
+      excludedItems.push({
+        item_ref: decRef,
+        item_type: "decision",
+        description: dec.situation,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  exceptions.forEach((exc, eIdx) => {
+    if (claimedExceptionIndices.has(eIdx)) return;
+    const excRef = exc.source_ref || `exc-${eIdx + 1}`;
+    const ledgerId = makeLedgerItemId("exception", exc.source_ref, eIdx);
+    if (!exc.trigger || exc.trigger.trim().length <= 3) {
+      const reason = `Exception protocol has ambiguous or empty trigger text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "exception",
+        source_ref: excRef,
+        description: exc.trigger || "Empty exception trigger",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: excRef,
+        item_type: "exception",
+        description: exc.trigger || "Empty exception trigger",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else {
+      const reason = `Exception handling protocol ("${exc.trigger}") is practiced in Guide Me real-world problem scenarios.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "exception",
+        source_ref: excRef,
+        description: exc.trigger,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Practiced in Guide Me real-world problem scenarios."
+      });
+      excludedItems.push({
+        item_ref: excRef,
+        item_type: "exception",
+        description: exc.trigger,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  escalations.forEach((esc, escIdx) => {
+    if (claimedEscalationIndices.has(escIdx)) return;
+    const escRef = esc.source_ref || `esc-${escIdx + 1}`;
+    const ledgerId = makeLedgerItemId("escalation", esc.source_ref, escIdx);
+    if (!esc.situation || esc.situation.trim().length <= 3) {
+      const reason = `Escalation pathway has ambiguous or empty situation text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "escalation",
+        source_ref: escRef,
+        description: esc.situation || "Empty escalation situation",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: escRef,
+        item_type: "escalation",
+        description: esc.situation || "Empty escalation situation",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else {
+      const reason = `Escalation reporting pathway ("${esc.situation}") is trained in Guide Me / Test Me scenario practice.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "escalation",
+        source_ref: escRef,
+        description: esc.situation,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Trained in Guide Me / Test Me scenario practice."
+      });
+      excludedItems.push({
+        item_ref: escRef,
+        item_type: "escalation",
+        description: esc.situation,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  safetyRules.forEach((safe, sIdx) => {
+    if (claimedSafetyIndices.has(sIdx)) return;
+    const safeRef = safe.source_ref || `safe-${sIdx + 1}`;
+    const ledgerId = makeLedgerItemId("safety_rule", safe.source_ref, sIdx);
+    if (!safe.rule || safe.rule.trim().length <= 3) {
+      const reason = `Safety rule has ambiguous or empty text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "safety_rule",
+        source_ref: safeRef,
+        description: safe.rule || "Empty safety rule",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: safeRef,
+        item_type: "safety_rule",
+        description: safe.rule || "Empty safety rule",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else if (isProhibitiveRule(safe.rule)) {
+      const reason = `Safety prohibition ("${safe.rule}") is verified via Test Me compliance check questions rather than procedural demonstration video.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "safety_rule",
+        source_ref: safeRef,
+        description: safe.rule,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Test Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Verified via Test Me compliance check questions."
+      });
+      excludedItems.push({
+        item_ref: safeRef,
+        item_type: "safety_rule",
+        description: safe.rule,
+        reason,
+        disposition: "assigned_to_test_me",
+        assigned_mode: "Test Me"
+      });
+    } else {
+      const reason = `Workplace safety protocol ("${safe.rule}") is practiced in Guide Me real-world safety scenarios.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "safety_rule",
+        source_ref: safeRef,
+        description: safe.rule,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Practiced in Guide Me real-world safety scenarios."
+      });
+      excludedItems.push({
+        item_ref: safeRef,
+        item_type: "safety_rule",
+        description: safe.rule,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  qualityRules.forEach((qual, qIdx) => {
+    if (claimedQualityIndices.has(qIdx)) return;
+    const qualRef = qual.source_ref || `qual-${qIdx + 1}`;
+    const ledgerId = makeLedgerItemId("control", qual.source_ref, qIdx);
+    if (!qual.rule || qual.rule.trim().length <= 3) {
+      const reason = `Quality rule has ambiguous or empty text and requires human instructional review.`;
+      const item = {
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: qualRef,
+        description: qual.rule || "Empty quality rule",
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved",
+        reason,
+        confidence: "unresolved",
+        coverage_status: "planned",
+        instructional_proof: "Unresolved source text requiring instructional SME review"
+      };
+      coverageLedger.push(item);
+      unresolvedItems.push(item);
+      excludedItems.push({
+        item_ref: qualRef,
+        item_type: "control",
+        description: qual.rule || "Empty quality rule",
+        reason,
+        disposition: "unresolved_review_required",
+        assigned_mode: "Unresolved"
+      });
+    } else {
+      const reason = `Quality execution standard ("${qual.rule}") is practiced in Guide Me simulation scenarios.`;
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: qualRef,
+        description: qual.rule,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Guide Me",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Practiced in Guide Me simulation scenarios."
+      });
+      excludedItems.push({
+        item_ref: qualRef,
+        item_type: "control",
+        description: qual.rule,
+        reason,
+        disposition: "assigned_to_guide_me",
+        assigned_mode: "Guide Me"
+      });
+    }
+  });
+  if (prerequisites && prerequisites.length > 0) {
+    prerequisites.forEach((pre, idx) => {
+      const preRef = pre.source_ref || `pre-${idx + 1}`;
+      const ledgerId = makeLedgerItemId("control", pre.source_ref, idx);
+      const reason = "Pre-operational qualification verified in Know It orientation cards before physical floor entry.";
+      coverageLedger.push({
+        item_id: ledgerId,
+        item_type: "control",
+        source_ref: preRef,
+        description: pre.text,
+        disposition: "assigned_to_learning_mode",
+        assigned_mode: "Know It",
+        reason,
+        confidence: "high",
+        coverage_status: "verified_instructional_coverage",
+        instructional_proof: "Pre-operational qualification verified in Know It orientation cards before physical floor entry."
+      });
+      excludedItems.push({
+        item_ref: preRef,
+        item_type: "control",
+        description: pre.text,
+        reason,
+        disposition: "assigned_to_know_it",
+        assigned_mode: "Know It"
+      });
+    });
+  }
+  const totalDuration = plannedClips.reduce((sum, c) => sum + (c.duration_seconds || 8), 0);
+  const plan = {
+    strategy: "sequential_steps",
+    total_clips: plannedClips.length,
+    clips: plannedClips,
+    total_estimated_duration_seconds: totalDuration,
+    excluded_from_video: excludedItems,
+    coverage_ledger: coverageLedger,
+    unresolved_items: unresolvedItems.length > 0 ? unresolvedItems : void 0,
+    validation_status: "valid"
+  };
+  const validation = validateVideoPlan(plan, blueprint);
+  plan.validation_status = validation.isValid ? "valid" : "invalid";
+  if (!validation.isValid) {
+    plan.validation_errors = validation.errors;
+  }
+  return plan;
+}
+function buildOnScreenText(steps, controlRule, escalationAction) {
+  if (escalationAction) {
+    const cleanEsc = escalationAction.replace(/^notify\s+/i, "").replace(/^report to\s+/i, "").toUpperCase();
+    return `ANOMALY DETECTED \u2192 ESCALATE TO ${cleanEsc.slice(0, 18)}`;
+  }
+  if (controlRule && controlRule.length < 25) {
+    return controlRule.toUpperCase();
+  }
+  const firstVerb = steps[0]?.action_verb?.toUpperCase() || "EXECUTE";
+  const firstTarget = (steps[0]?.task_title || steps[0]?.instruction || "").split(/\s+/).slice(0, 2).join(" ").toUpperCase();
+  if (steps.length > 1) {
+    const secondVerb = steps[1]?.action_verb?.toUpperCase() || "VERIFY";
+    return `${firstVerb} ${firstTarget} \u2192 THEN ${secondVerb}`;
+  }
+  return `${firstVerb} ${firstTarget}`;
+}
+function validateVideoPlan(plan, blueprint) {
+  const errors = [];
+  const steps = blueprint.operational_steps || [];
+  const controls = blueprint.critical_controls || [];
+  const decisions = blueprint.decision_points || [];
+  const exceptions = blueprint.exceptions || [];
+  const escalations = blueprint.escalations || [];
+  const prerequisites = blueprint.prerequisites || [];
+  const coveredStepIndices = /* @__PURE__ */ new Set();
+  plan.clips.forEach((clip) => {
+    (clip.covered_step_refs || []).forEach((ref) => {
+      steps.forEach((step, idx) => {
+        if (ref === step.source?.source_ref || ref === `step-${idx + 1}` || clip.key_action === step.instruction) {
+          coveredStepIndices.add(idx);
+        }
+      });
+    });
+  });
+  const uncoveredSteps = [];
+  steps.forEach((_, idx) => {
+    if (!coveredStepIndices.has(idx)) {
+      uncoveredSteps.push(idx + 1);
+    }
+  });
+  if (uncoveredSteps.length > 0) {
+    errors.push(`Coverage Failure: Steps [${uncoveredSteps.join(", ")}] were silently omitted from the video plan.`);
+  }
+  if (!plan.clips || plan.clips.length === 0) {
+    errors.push("Validation Failure: Video plan contains zero scenes.");
+  }
+  if (plan.total_clips !== plan.clips.length) {
+    errors.push(`Integrity Failure: total_clips (${plan.total_clips}) does not match clips array length (${plan.clips.length}).`);
+  }
+  const seenPurposes = /* @__PURE__ */ new Set();
+  plan.clips.forEach((clip, idx) => {
+    if (seenPurposes.has(clip.title.toLowerCase())) {
+      errors.push(`Duplicate Scene Failure: Scene ${idx + 1} repeats title "${clip.title}".`);
+    }
+    seenPurposes.add(clip.title.toLowerCase());
+  });
+  let lastSeenStepIndex = -1;
+  plan.clips.forEach((clip, cIdx) => {
+    (clip.covered_step_refs || []).forEach((ref) => {
+      steps.forEach((step, sIdx) => {
+        if (ref === step.source?.source_ref || ref === `step-${sIdx + 1}`) {
+          if (sIdx < lastSeenStepIndex) {
+            errors.push(`Sequence Failure: Scene ${cIdx + 1} steps (${sIdx + 1}) violate chronological order after step (${lastSeenStepIndex + 1}).`);
+          }
+          lastSeenStepIndex = Math.max(lastSeenStepIndex, sIdx);
+        }
+      });
+    });
+  });
+  plan.clips.forEach((clip, idx) => {
+    if (!clip.veo_prompt || clip.veo_prompt.trim().length < 20) {
+      errors.push(`Prompt Failure: Scene ${idx + 1} has an empty or invalid veo_prompt.`);
+    }
+    if (!clip.purpose) {
+      errors.push(`Pedagogical Failure: Scene ${idx + 1} is missing an instructional purpose.`);
+    }
+    if (!clip.what_the_learner_should_see) {
+      errors.push(`Visual Failure: Scene ${idx + 1} is missing what_the_learner_should_see.`);
+    }
+    if (!clip.what_the_learner_should_understand) {
+      errors.push(`Cognitive Failure: Scene ${idx + 1} is missing what_the_learner_should_understand.`);
+    }
+  });
+  if (plan.coverage_ledger) {
+    const safetyRules = blueprint.safety_rules || [];
+    const qualityRules = blueprint.quality_rules || [];
+    const totalExpectedSourceItems = steps.length + controls.length + decisions.length + exceptions.length + escalations.length + prerequisites.length + safetyRules.length + qualityRules.length;
+    const seenLedgerIds = /* @__PURE__ */ new Set();
+    plan.coverage_ledger.forEach((item) => {
+      if (seenLedgerIds.has(item.item_id)) {
+        errors.push(`Ledger Duplicate Failure: Item "${item.item_id}" is registered multiple times in the coverage ledger.`);
+      }
+      seenLedgerIds.add(item.item_id);
+    });
+    if (plan.coverage_ledger.length !== totalExpectedSourceItems) {
+      errors.push(`Ledger Completeness Failure: Coverage ledger recorded ${plan.coverage_ledger.length} items but expected ${totalExpectedSourceItems} source items.`);
+    }
+    plan.coverage_ledger.forEach((item) => {
+      if (item.disposition === "represented_in_video") {
+        if (!item.assigned_scene_index || !item.assigned_scene_id) {
+          errors.push(`Ledger Disposition Failure: Item "${item.item_id}" marked represented_in_video but missing assigned scene.`);
+        } else {
+          const clip = plan.clips.find((c) => c.clip_index === item.assigned_scene_index);
+          if (!clip) {
+            errors.push(`Ledger Scene Failure: Item "${item.item_id}" references non-existent scene ${item.assigned_scene_index}.`);
+          }
+        }
+      } else if (item.disposition === "assigned_to_learning_mode") {
+        if (!item.assigned_mode || !["Guide Me", "Test Me", "Know It"].includes(item.assigned_mode)) {
+          errors.push(`Ledger Destination Failure: Item "${item.item_id}" marked assigned_to_learning_mode has invalid destination "${item.assigned_mode}".`);
+        }
+        if (!item.reason || item.reason.trim().length === 0) {
+          errors.push(`Ledger Accountability Failure: Item "${item.item_id}" assigned to ${item.assigned_mode} without an instructional reason.`);
+        }
+      }
+    });
+    const unresolved = plan.coverage_ledger.filter((i) => i.disposition === "unresolved_review_required");
+    if (unresolved.length > 0) {
+      unresolved.forEach((u) => {
+        errors.push(`Unresolved Item Failure: Critical item "${u.item_id}" (${u.description.slice(0, 30)}) has unresolved instructional disposition.`);
+      });
+    }
+  }
+  const isValid = errors.length === 0;
+  return {
+    isValid,
+    errors,
+    metrics: {
+      totalSteps: steps.length,
+      coveredStepsCount: coveredStepIndices.size,
+      excludedItemsCount: (plan.excluded_from_video || []).length,
+      scenesCount: plan.clips.length,
+      totalEstimatedDuration: plan.total_estimated_duration_seconds || plan.clips.length * 8
+    }
+  };
+}
+
+// server.ts
 dotenv.config();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
 function extractDocxTextFromBuffer(buffer) {
   try {
     let offset = 0;
@@ -44,7 +1217,7 @@ function extractDocxTextFromBuffer(buffer) {
   }
   return "";
 }
-const videosDir = path.resolve(process.cwd(), "uploads", "videos");
+var videosDir = path.resolve(process.cwd(), "uploads", "videos");
 if (!fs.existsSync(videosDir)) {
   fs.mkdirSync(videosDir, { recursive: true });
 }
@@ -52,8 +1225,8 @@ function getSafeVideoPath(lessonId, clipIndex = 1) {
   const safeId = lessonId.replace(/[^a-zA-Z0-9_-]/g, "_");
   return path.join(videosDir, `${safeId}_clip_${clipIndex}.mp4`);
 }
-const app = express();
-const PORT = Number(process.env.PORT) || 3e3;
+var app = express();
+var PORT = Number(process.env.PORT) || 3e3;
 app.use(express.json({ limit: "15mb" }));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -82,8 +1255,8 @@ function getGeminiClient(req) {
     }
   });
 }
-const MODEL_PRO = process.env.GEMINI_PRO_MODEL || "gemini-3.1-pro-preview";
-const MODEL_FAST = process.env.GEMINI_FAST_MODEL || "gemini-3.8-flash";
+var MODEL_PRO = process.env.GEMINI_PRO_MODEL || "gemini-3.1-pro-preview";
+var MODEL_FAST = process.env.GEMINI_FAST_MODEL || "gemini-3.8-flash";
 app.get("/api/health", (_req, res) => {
   const key = getApiKey();
   res.json({
@@ -719,9 +1892,9 @@ app.all("/api/*", (req, res) => {
     message: `API endpoint ${req.method} ${req.path} not found on server`
   });
 });
-const distPath = path.resolve(process.cwd(), "dist");
-const indexHtmlExists = fs.existsSync(path.join(distPath, "index.html"));
-const isProduction = process.env.NODE_ENV === "production" || indexHtmlExists && process.env.NODE_ENV !== "development";
+var distPath = path.resolve(process.cwd(), "dist");
+var indexHtmlExists = fs.existsSync(path.join(distPath, "index.html"));
+var isProduction = process.env.NODE_ENV === "production" || indexHtmlExists && process.env.NODE_ENV !== "development";
 if (isProduction) {
   app.use(express.static(distPath));
   app.get("*", (req, res) => {

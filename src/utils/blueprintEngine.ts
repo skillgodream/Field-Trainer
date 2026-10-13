@@ -27,27 +27,19 @@ export function buildProcessPassport(
 
   const questionsForTrainer: { field: string; question: string }[] = [];
 
-  // Plain Definition (allows general knowledge if not in source)
-  const plainDefinitionText = combinedText.toLowerCase().includes('picking')
-    ? 'Picking is collecting exact items from warehouse shelves for customer orders.'
-    : `${processName} is the standard frontline operational procedure for ${role}.`;
+  const plainDefinitionText = combinedText.length > 20
+    ? `${processName} standard operating procedure for ${role}.`
+    : `Standard operational procedure for ${processName}.`;
   
   const plainDefinitionBasis = sources.length > 0 ? 'from_source' : 'general_knowledge';
 
   // Why It Matters (NEVER filled from general knowledge)
-  const hasWhyInSource = combinedText.toLowerCase().includes('cut-off') || combinedText.toLowerCase().includes('customer');
+  const hasWhyInSource = combinedText.toLowerCase().includes('impact') || combinedText.toLowerCase().includes('matters') || combinedText.toLowerCase().includes('critical');
   const whyItMatters = hasWhyInSource
     ? [
         {
-          who_depends: 'Outbound Carriers & Shipping',
-          impact: 'Meeting strict departure cut-off times guarantees same-day dispatch.',
-          source_ref: mainSourceId,
-          basis: 'from_source' as const,
-          status: 'draft' as const,
-        },
-        {
-          who_depends: 'Inventory Control Team',
-          impact: 'Accurate bin barcode scanning prevents inventory discrepancies.',
+          who_depends: 'Operations Team & Quality Lead',
+          impact: `Ensures compliance and safety during ${processName}.`,
           source_ref: mainSourceId,
           basis: 'from_source' as const,
           status: 'draft' as const,
@@ -64,71 +56,70 @@ export function buildProcessPassport(
 
   // Where It Fits
   const whereItFits = {
-    upstream: 'WMS Batch Order Assignment & Release',
+    upstream: 'Pre-process Preparation / Assignment',
     this: processName,
-    downstream: 'Packing Station Handover & Parcel Sealing',
+    downstream: 'Process Handover / Log Completion',
     source_ref: mainSourceId,
     status: 'draft' as const,
   };
 
-  // Tools
-  const tools = [
-    {
-      name: 'Handheld WMS Scanner',
-      what_it_is: 'Rugged Android barcode terminal with laser aimer.',
-      purpose: 'Directs tasks and verifies bin barcode scans.',
-      never_do: 'Never key quantities manually without counting physical items.',
-      visual_hint: 'Black pistol-grip terminal with digital display',
+  // Tools explicitly extracted from source
+  const tools: ProcessPassport['fields']['tools'] = [];
+  const lowerText = combinedText.toLowerCase();
+  if (lowerText.includes('tool') || lowerText.includes('equipment') || lowerText.includes('scanner') || lowerText.includes('thermometer') || lowerText.includes('probe')) {
+    const lines = combinedText.split('\n').filter(l => l.toLowerCase().includes('tool') || l.toLowerCase().includes('equipment') || l.toLowerCase().includes('scanner') || l.toLowerCase().includes('thermometer'));
+    lines.forEach((l, idx) => {
+      tools.push({
+        name: l.split(/[:\-\—]/)[0]?.trim() || `Tool ${idx + 1}`,
+        what_it_is: l.trim(),
+        purpose: l.trim(),
+        never_do: '',
+        visual_hint: 'Operational equipment',
+        source_ref: mainSourceId,
+        basis: 'from_source' as const,
+        status: 'draft' as const,
+      });
+    });
+  }
+
+  // Terms explicitly extracted from source
+  const terms: ProcessPassport['fields']['terms'] = [];
+
+  // Golden Rules
+  const goldenRules: ProcessPassport['fields']['golden_rules'] = [];
+  const ruleLines = combinedText.split('\n').filter(l => l.toLowerCase().includes('must') || l.toLowerCase().includes('never') || l.toLowerCase().includes('always'));
+  ruleLines.forEach(l => {
+    goldenRules.push({
+      text: l.trim(),
       source_ref: mainSourceId,
-      basis: 'from_source' as const,
       status: 'draft' as const,
-    },
-    {
-      name: 'Order Tote',
-      what_it_is: 'Heavy-duty plastic crate with unique barcode ID.',
-      purpose: 'Carries items for one specific customer order.',
-      never_do: 'Never mix multiple orders in one tote.',
-      visual_hint: 'Blue heavy plastic bin with barcode tag',
-      source_ref: mainSourceId,
-      basis: 'from_source' as const,
-      status: 'draft' as const,
-    },
-  ];
+    });
+  });
 
-  // Terms
-  const terms = [
-    { term: 'Cut-off', meaning: 'The deadline time an order must be picked for carrier dispatch.', source_ref: mainSourceId, status: 'draft' as const },
-    { term: 'SKU', meaning: 'Unique item stock code printed on product barcodes.', source_ref: mainSourceId, status: 'draft' as const },
-    { term: 'Bin', meaning: 'A single shelf storage slot identified by Aisle-Bay-Level.', source_ref: mainSourceId, status: 'draft' as const },
-  ];
-
-  // Golden Rules (NEVER filled from general knowledge)
-  const hasRulesInSource = combinedText.toLowerCase().includes('scan') || combinedText.toLowerCase().includes('never');
-  const goldenRules = hasRulesInSource
-    ? [
-        { text: 'Scan location label before touching any items.', source_ref: mainSourceId, status: 'draft' as const },
-        { text: 'Match exact SKU code numbers and letters.', source_ref: mainSourceId, status: 'draft' as const },
-        { text: 'One tote per order — never mix orders.', source_ref: mainSourceId, status: 'draft' as const },
-      ]
-    : [];
-
-  if (!hasRulesInSource) {
+  if (goldenRules.length === 0) {
     questionsForTrainer.push({
       field: 'golden_rules',
-      question: 'What are the top 3 non-negotiable golden rules for workers doing this process?',
+      question: 'What are the non-negotiable golden rules for workers doing this process?',
     });
   }
 
   // Safety Notes
-  const safetyNotes = combinedText.toLowerCase().includes('safety') || combinedText.toLowerCase().includes('hazard')
-    ? [{ text: 'Wear Hi-Vis vest and steel-toe boots in forklift zones.', source_ref: mainSourceId, status: 'draft' as const }]
-    : [];
+  const safetyNotes: ProcessPassport['fields']['safety_notes'] = [];
+  const safetyLines = combinedText.split('\n').filter(l => l.toLowerCase().includes('safety') || l.toLowerCase().includes('ppe') || l.toLowerCase().includes('hazard'));
+  safetyLines.forEach(l => {
+    safetyNotes.push({
+      text: l.trim(),
+      source_ref: mainSourceId,
+      status: 'draft' as const,
+    });
+  });
 
   // Escalation
+  const escLine = combinedText.split('\n').find(l => l.toLowerCase().includes('escalat') || l.toLowerCase().includes('notify') || l.toLowerCase().includes('contact'));
   const escalation = {
-    text: 'Tap "Ask my trainer" on your scanner screen to request Lead Supervisor Marcus.',
+    text: escLine ? escLine.trim() : 'Escalate unresolved anomalies to the designated department lead or supervisor.',
     source_ref: mainSourceId,
-    basis: 'from_source' as const,
+    basis: escLine ? ('from_source' as const) : ('general_knowledge' as const),
     status: 'draft' as const,
   };
 

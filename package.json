@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --platform=node --format=esm --outfile=server.js --packages=external",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --outfile=server.js --packages=external",
     "start": "node server.ts",
     "clean": "rm -rf dist server.js",
     "design-lint": "node scripts/design-lint.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/utils/videoPlanEngine.test.ts && tsx src/experiment/knowItPlanner.test.ts"
+    "test": "tsx src/utils/videoPlanEngine.test.ts && tsx src/experiment/knowItPlanner.test.ts && tsx src/utils/endToEndIntegrationTest.ts && tsx src/utils/architectureRegression.test.ts && tsx src/utils/housekeepingAcceptanceTest.ts && tsx src/services/imageGenerationService.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
