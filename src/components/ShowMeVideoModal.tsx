@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, 
   Play, 
   Pause, 
   RotateCcw, 
   ArrowRight,
-  ArrowLeft,
-  Volume2,
-  VolumeX,
+  ChevronDown,
+  ChevronLeft,
   CheckCircle2
 } from 'lucide-react';
 import { Lesson } from '../types';
@@ -29,7 +27,7 @@ export interface OperationalScene {
   imageUrl: string;
 }
 
-// 4 Canonical Operational Demonstration Scenes with Photorealistic 4K Visuals
+// 4 Canonical Operational Demonstration Scenes
 const DEMONSTRATION_SCENES: OperationalScene[] = [
   {
     stepNumber: 1,
@@ -86,10 +84,8 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
   const currentScene = DEMONSTRATION_SCENES[currentStepIndex] || DEMONSTRATION_SCENES[0];
   const totalSteps = DEMONSTRATION_SCENES.length;
 
-  // Initialize playback on open
   useEffect(() => {
     if (!isOpen) return;
-
     setCurrentStepIndex(0);
     setIsPlaying(true);
     setIsSequenceComplete(false);
@@ -97,7 +93,6 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     startTimeRef.current = Date.now();
   }, [isOpen]);
 
-  // Hands-free continuous progression timer (Runs all 4 scenes automatically)
   useEffect(() => {
     if (!isOpen || !isPlaying || isSequenceComplete) {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
@@ -111,7 +106,6 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
       const progress = Math.min(1, elapsed / currentScene.durationSeconds);
       setPlaybackProgress(progress);
 
-      // When current scene reaches its maximum duration, automatically transition to next
       if (progress >= 1) {
         clearInterval(progressTimerRef.current!);
         handleAdvanceToNextScene();
@@ -123,7 +117,6 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     };
   }, [isOpen, isPlaying, currentStepIndex, isSequenceComplete, currentScene.durationSeconds]);
 
-  // Advance to next scene without user intervention
   const handleAdvanceToNextScene = () => {
     if (currentStepIndex < totalSteps - 1) {
       setCurrentStepIndex((prev) => prev + 1);
@@ -136,7 +129,6 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     }
   };
 
-  // Replay continuous demonstration
   const handleReplay = () => {
     setCurrentStepIndex(0);
     setPlaybackProgress(0);
@@ -145,7 +137,6 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     startTimeRef.current = Date.now();
   };
 
-  // Select specific step
   const handleSelectStep = (idx: number) => {
     setCurrentStepIndex(idx);
     setPlaybackProgress(0);
@@ -167,41 +158,27 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl p-2 sm:p-5 select-none animate-in fade-in duration-200">
       
-      {/* Apple Minimalist Dark Slate Container - Zero Clutter, Zero Pills */}
+      {/* Container */}
       <div className="w-full max-w-4xl h-[94vh] sm:h-[88vh] bg-[#0A0D14] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between relative">
         
-        {/* 1. CLEAN APPLE HEADER (No pills, no status badges, no backend text) */}
-        <header className="px-6 py-4 flex items-center justify-between border-b border-white/[0.08] bg-black/40 shrink-0">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              Passenger Boarding Demonstration
-            </h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Continuous workplace visual walkthrough
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-medium text-zinc-400 font-mono">
-              {currentStepIndex + 1} of {totalSteps}
-            </span>
-
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-              title="Close"
-              aria-label="Close"
-            >
-              <X size={16} />
-            </button>
-          </div>
+        {/* 1. CLEAN APPLE HEADER (NO header text, NO title, NO step counter, ONLY small back icon) */}
+        <header className="px-5 py-3 flex items-center justify-between border-b border-white/[0.06] bg-black/30 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+            title="Back"
+            aria-label="Back"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <div>{/* Empty space - Clean header with no text */}</div>
         </header>
 
-        {/* 2. BODY: CINEMATIC PHOTOREALISTIC VIDEO SCREEN + ACTIVE STEP TEXT */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-between gap-5 min-h-0">
+        {/* 2. BODY CONTAINER: EXACT 60:40 HEIGHT RATIO (Video : Text) */}
+        <div className="flex-1 overflow-hidden p-4 sm:p-5 flex flex-col gap-4 min-h-0 relative">
           
-          {/* A. 16:9 Widescreen Photographic Display Stage (Real Documentary Workplace Visuals) */}
-          <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl flex items-center justify-center group shrink-0">
+          {/* A. VIDEO STAGE: Exactly 60% Height Ratio */}
+          <div className="h-[60%] flex-[6] w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl relative group flex items-center justify-center shrink-0 min-h-0">
             <img
               src={currentScene.imageUrl}
               alt={currentScene.title}
@@ -210,95 +187,64 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
               }`}
             />
 
-            {/* Sequence Finished Overlay */}
-            {isSequenceComplete && (
-              <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 z-30">
-                <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
-                  <CheckCircle2 size={28} />
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-1">
-                  Demonstration Sequence Complete
-                </h3>
-                <p className="text-xs sm:text-sm text-zinc-300 max-w-sm mb-5 leading-relaxed">
-                  All 4 continuous operational scenes completed. Ready to proceed to practical decision practice?
-                </p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleReplay}
-                    className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer border border-white/15"
-                  >
-                    <RotateCcw size={14} />
-                    <span>Replay</span>
-                  </button>
-                  {onContinueToGuideMe && (
-                    <button
-                      onClick={onContinueToGuideMe}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-blue-500/30"
-                    >
-                      <span>Make the Decision</span>
-                      <ArrowRight size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Subtle Controls Bar on Hover or Pause */}
-            <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4 flex items-center justify-between transition-opacity duration-200 ${
+            {/* Subtle Controls Overlay on Hover or Pause */}
+            <div className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 flex items-center justify-between transition-opacity duration-200 ${
               isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
             }`}>
               <div className="flex items-center gap-3">
                 <button
                   onClick={togglePlayPause}
-                  className="w-9 h-9 rounded-full bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md"
+                  className="w-8 h-8 rounded-full bg-white/25 hover:bg-white/35 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md"
                   aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? <Pause size={16} /> : <Play size={16} className="translate-x-0.5" />}
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} className="translate-x-0.5" />}
                 </button>
 
                 <button
                   onClick={handleReplay}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
                   title="Replay sequence"
                 >
-                  <RotateCcw size={14} />
+                  <RotateCcw size={13} />
                 </button>
               </div>
 
-              <div className="text-xs font-mono text-zinc-300 bg-black/60 px-3 py-1 rounded-full border border-white/10">
+              <div className="text-[11px] font-mono text-zinc-300 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10">
                 {Math.round(playbackProgress * currentScene.durationSeconds)}s / {currentScene.durationSeconds}s
               </div>
             </div>
           </div>
 
-          {/* B. SINGLE SYNCHRONIZED STEP TEXT (Quiet, Elegant, Zero Pills) */}
-          <div className="space-y-3 bg-[#0E121E]/80 border border-white/[0.08] rounded-2xl p-4 sm:p-5">
-            {/* Clean Tracked Header (No pill borders) */}
-            <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span className="font-bold tracking-widest text-blue-400 uppercase text-[11px]">
-                {currentScene.section}
-              </span>
-              <span className="font-mono text-zinc-500">
-                {currentScene.durationSeconds}s
-              </span>
+          {/* B. INSTRUCTION TEXT CARD: Exactly 40% Height Ratio */}
+          <div className="h-[40%] flex-[4] overflow-y-auto bg-[#0E121E]/90 border border-white/[0.08] rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-2 shrink-0 min-h-0">
+            <div className="space-y-2">
+              {/* Section Header */}
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-bold tracking-widest text-blue-400 uppercase text-[11px]">
+                  {currentScene.section}
+                </span>
+                <span className="font-mono text-zinc-500 text-[11px]">
+                  {currentScene.durationSeconds}s
+                </span>
+              </div>
+
+              {/* Step Title */}
+              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight leading-snug">
+                {currentScene.title}
+              </h3>
+
+              {/* Operational Directive */}
+              <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-normal">
+                {currentScene.instruction}
+              </p>
             </div>
 
-            {/* Step Title */}
-            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              {currentScene.title}
-            </h3>
-
-            {/* Operational Directive */}
-            <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-normal pt-0.5">
-              {currentScene.instruction}
-            </p>
-
-            {/* Key Verification Focus Box */}
-            <div className="pt-2 border-t border-white/[0.06] flex flex-col gap-1">
+            {/* Learner Focus Footer */}
+            <div className="pt-2 border-t border-white/[0.06] flex flex-col gap-0.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                 Learner Focus
               </span>
-              <p className="text-xs text-zinc-300 leading-relaxed">
+              <p className="text-xs text-zinc-300 leading-normal truncate">
                 {currentScene.keyVerification}
               </p>
             </div>
@@ -306,8 +252,8 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
 
         </div>
 
-        {/* 3. APPLE MULTI-SEGMENT CONTINUOUS TIMELINE (Bottom Progress Line) */}
-        <footer className="px-6 py-4 border-t border-white/[0.08] bg-black/50 shrink-0">
+        {/* 3. TIMELINE PROGRESS BAR FOOTER */}
+        <footer className="px-5 py-3 border-t border-white/[0.06] bg-black/50 shrink-0">
           <div className="grid grid-cols-4 gap-2 w-full">
             {DEMONSTRATION_SCENES.map((sc, idx) => {
               const isPassed = idx < currentStepIndex;
@@ -320,23 +266,18 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
                   onClick={() => handleSelectStep(idx)}
                   className="flex flex-col gap-1 text-left cursor-pointer group"
                 >
-                  {/* Thin Clean Apple Progress Line */}
                   <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 rounded-full transition-all duration-100"
+                      className="h-full bg-indigo-500 rounded-full transition-all duration-100"
                       style={{ width: `${progressFill}%` }}
                     />
                   </div>
 
-                  {/* Clean Plain Text Label (No Pills) */}
-                  <div className="flex items-center justify-between text-[11px] pt-0.5">
+                  <div className="flex items-center justify-between text-[10px] pt-0.5">
                     <span className={`font-semibold truncate transition-colors ${
                       isCurrent ? 'text-white' : isPassed ? 'text-zinc-400' : 'text-zinc-600'
                     }`}>
                       0{sc.stepNumber}. {sc.title.split(' ')[0]}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">
-                      {sc.durationSeconds}s
                     </span>
                   </div>
                 </button>
@@ -344,6 +285,76 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
             })}
           </div>
         </footer>
+
+        {/* 4. ENDING SCREEN / COMPLETION OVERLAY (EXACTLY MATCHES SCREENSHOT 1) */}
+        {isSequenceComplete && (
+          <div className="absolute inset-0 z-50 bg-[#0E1116]/90 backdrop-blur-2xl flex flex-col items-center justify-between p-6 sm:p-8 animate-in fade-in duration-300">
+            {/* Top Bar with small close chevron icon */}
+            <div className="w-full flex justify-end">
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer"
+                title="Close"
+                aria-label="Close"
+              >
+                <ChevronDown size={18} />
+              </button>
+            </div>
+
+            {/* Center Content Matching Screenshot 1 layout */}
+            <div className="flex flex-col items-center justify-center text-center max-w-md my-auto space-y-5">
+              {/* Animated Progress Ring Spinner */}
+              <div className="relative w-20 h-20 flex items-center justify-center mb-2">
+                <div className="absolute inset-0 rounded-full border-4 border-white/15"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 border-r-indigo-400 animate-spin"></div>
+                <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                  <CheckCircle2 size={22} />
+                </div>
+              </div>
+
+              {/* Headline - Replaced "Analyzing document..." with "Completed document..." */}
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Completed document...
+              </h2>
+
+              {/* Subtitle */}
+              <p className="text-sm text-zinc-300 leading-relaxed max-w-xs">
+                Building your operational training experience.
+              </p>
+
+              {/* Action Pill Buttons */}
+              <div className="pt-3 flex flex-col sm:flex-row items-center gap-3">
+                {onContinueToGuideMe ? (
+                  <button
+                    onClick={onContinueToGuideMe}
+                    className="px-8 py-3 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <span>Make the Decision</span>
+                    <ArrowRight size={14} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={onClose}
+                    className="px-8 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold backdrop-blur-sm transition-all cursor-pointer"
+                  >
+                    Done
+                  </button>
+                )}
+
+                <button
+                  onClick={handleReplay}
+                  className="px-6 py-2.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/15 text-white text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCcw size={13} />
+                  <span>Replay</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom spacer */}
+            <div className="h-6"></div>
+          </div>
+        )}
 
       </div>
     </div>
