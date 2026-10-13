@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { 
   Sparkles, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight, 
   BookOpen, Layers, CheckSquare, HelpCircle, Flame, Award, RotateCcw,
-  Zap, Lightbulb, ExternalLink
+  Zap, Lightbulb, ExternalLink, ChevronRight
 } from 'lucide-react';
 import { Lesson } from '../types';
 import { INITIAL_LESSONS } from '../data/lessonsData';
@@ -38,7 +38,7 @@ export function ContentCardScreen({ onBack, lesson = INITIAL_LESSONS[0] }: Conte
         items: [s.instruction],
         critical_control: s.critical_control ? 'Strict adherence required for safety & compliance audit.' : undefined
       }))
-    : lesson.operationalSteps || [
+    : (lesson as any).operationalSteps || [
         {
           step: 'Step 1',
           title: 'Prepare SOP Parameters',
@@ -64,13 +64,13 @@ export function ContentCardScreen({ onBack, lesson = INITIAL_LESSONS[0] }: Conte
       ];
 
   const criticalControls = lesson.operationalBlueprint?.critical_controls?.map(c => c.rule) || 
-    lesson.criticalControls || [
+    (lesson as any).criticalControls || [
       'Strict dilution and safety ratios must be verified.',
       'Mandatory PPE during chemical or heavy equipment handling.'
     ];
 
   const commonMistakes = lesson.operationalBlueprint?.common_mistakes?.map(m => ({ mistake: m.mistake, correction: m.prevention })) ||
-    lesson.commonMistakes || [
+    (lesson as any).commonMistakes || [
       { mistake: 'Bypassing verification step', correction: 'Always verify parameters before proceeding.' }
     ];
 

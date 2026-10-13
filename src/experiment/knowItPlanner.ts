@@ -264,8 +264,12 @@ function scenarioSlides(step: KStep, seed: number, topic: string): Slide[] | nul
     },
     {
       type: 'DECISION',
-      title: 'What should you do?',
+      tag: 'DECISION POINT',
+      title: 'What should you Do?',
       content: clip(q, 260),
+      img:
+        (step as any).img ||
+        'https://images.unsplash.com/photo-1584634731339-252c581abfc5?auto=format&fit=crop&w=800&q=80',
       opts: choices.map((c) => ({ t: c.text, why: c.feedback, ok: c.isCorrect ? 1 : 0 })),
       choices,
     },
