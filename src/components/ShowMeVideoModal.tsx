@@ -6,6 +6,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronLeft,
+  Check,
   CheckCircle2
 } from 'lucide-react';
 import { Lesson } from '../types';
@@ -27,8 +28,8 @@ export interface OperationalScene {
   imageUrl: string;
 }
 
-// 4 Canonical Operational Demonstration Scenes
-const DEMONSTRATION_SCENES: OperationalScene[] = [
+// Default Aviation Fallback (used only when specific aviation lesson is selected or fallback)
+const DEFAULT_AVIATION_SCENES: OperationalScene[] = [
   {
     stepNumber: 1,
     title: "Prepare the Boarding Operation",
@@ -67,6 +68,124 @@ const DEMONSTRATION_SCENES: OperationalScene[] = [
   },
 ];
 
+/**
+ * Dynamically derives domain-specific demonstration scenes from the current Lesson object
+ */
+function getScenesForLesson(lesson?: Lesson): OperationalScene[] {
+  if (!lesson) return DEFAULT_AVIATION_SCENES;
+
+  const lessonTitleLower = (lesson.title || '').toLowerCase();
+  const descriptionLower = (lesson.description || '').toLowerCase();
+  const fullText = `${lessonTitleLower} ${descriptionLower}`;
+
+  const getImageForScene = (idx: number, text: string) => {
+    const combined = `${fullText} ${text.toLowerCase()}`;
+    if (combined.includes('housekeeping') || combined.includes('sanitiz') || combined.includes('room') || combined.includes('cleaning') || combined.includes('disinfect')) {
+      const images = [
+        '/Guruji_Real_Photo_Visual_Library_500/023_safety_ppe_equipment.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/009_hospitality_room_cleaning.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/010_hospitality_bed_making.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/012_hospitality_handwashing.webp',
+      ];
+      return images[idx % images.length];
+    }
+    if (combined.includes('warehouse') || combined.includes('pick') || combined.includes('pack') || combined.includes('tote') || combined.includes('inventory')) {
+      const images = [
+        '/Guruji_Real_Photo_Visual_Library_500/005_warehouse_inventory_check.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/029_technology_qr_scan.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/004_warehouse_packing_box.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/006_warehouse_pallet_jack.webp',
+      ];
+      return images[idx % images.length];
+    }
+    if (combined.includes('safety') || combined.includes('chemical') || combined.includes('ppe') || combined.includes('hazard') || combined.includes('spill')) {
+      const images = [
+        '/Guruji_Real_Photo_Visual_Library_500/023_safety_ppe_equipment.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/026_safety_spill_cleanup.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/024_safety_fire_extinguisher.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/025_safety_emergency_exit.webp',
+      ];
+      return images[idx % images.length];
+    }
+    if (combined.includes('retail') || combined.includes('cashier') || combined.includes('store') || combined.includes('shelf')) {
+      const images = [
+        '/Guruji_Real_Photo_Visual_Library_500/002_retail_cashier_scanning_product.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/003_retail_shelf_restocking.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/001_retail_store_front.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/029_technology_qr_scan.webp',
+      ];
+      return images[idx % images.length];
+    }
+    if (combined.includes('manufactur') || combined.includes('machine') || combined.includes('assembly') || combined.includes('factory')) {
+      const images = [
+        '/Guruji_Real_Photo_Visual_Library_500/016_manufacturing_machine_operation.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/017_manufacturing_quality_check.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/018_maintenance_repair.webp',
+        '/Guruji_Real_Photo_Visual_Library_500/023_safety_ppe_equipment.webp',
+      ];
+      return images[idx % images.length];
+    }
+    if (combined.includes('boarding') || combined.includes('aviation') || combined.includes('flight') || combined.includes('passenger')) {
+      const images = [
+        '/demonstration_scenes/scene_1.png',
+        '/demonstration_scenes/scene_2.png',
+        '/demonstration_scenes/scene_3.png',
+        '/demonstration_scenes/scene_4.png',
+      ];
+      return images[idx % images.length];
+    }
+
+    const generalImages = [
+      '/Guruji_Real_Photo_Visual_Library_500/005_warehouse_inventory_check.webp',
+      '/Guruji_Real_Photo_Visual_Library_500/017_manufacturing_quality_check.webp',
+      '/Guruji_Real_Photo_Visual_Library_500/023_safety_ppe_equipment.webp',
+      '/Guruji_Real_Photo_Visual_Library_500/027_admin_document_filing.webp',
+    ];
+    return generalImages[idx % generalImages.length];
+  };
+
+  // 1. Check videoPlan.clips
+  if (lesson.videoPlan?.clips && lesson.videoPlan.clips.length > 0) {
+    return lesson.videoPlan.clips.map((clip, idx) => ({
+      stepNumber: clip.clip_index || idx + 1,
+      title: clip.title || `Demonstration Step ${idx + 1}`,
+      section: clip.step_ref || `Section ${idx + 1}`,
+      instruction: clip.critical_action || clip.purpose || clip.key_action || `Execute operational step ${idx + 1}`,
+      keyVerification: clip.what_the_learner_should_understand || clip.control_or_decision || `Verify compliance with ${lesson.title}`,
+      durationSeconds: clip.duration_seconds || 10,
+      imageUrl: getImageForScene(idx, `${clip.title} ${clip.critical_action || ''}`),
+    }));
+  }
+
+  // 2. Check operationalBlueprint.operational_steps
+  if (lesson.operationalBlueprint?.operational_steps && lesson.operationalBlueprint.operational_steps.length > 0) {
+    return lesson.operationalBlueprint.operational_steps.slice(0, 4).map((s, idx) => ({
+      stepNumber: idx + 1,
+      title: s.task_title || s.action_verb || `Operational Step ${idx + 1}`,
+      section: s.source?.page_or_section || `Section ${idx + 1}`,
+      instruction: s.instruction,
+      keyVerification: s.why_it_matters || `Mandatory requirement: ${s.source?.source_text || s.instruction}`,
+      durationSeconds: 10,
+      imageUrl: getImageForScene(idx, s.instruction),
+    }));
+  }
+
+  // 3. Check stepObjects
+  if (lesson.stepObjects && lesson.stepObjects.length > 0) {
+    return lesson.stepObjects.slice(0, 4).map((s, idx) => ({
+      stepNumber: idx + 1,
+      title: s.title || `Operational Step ${idx + 1}`,
+      section: `Step ${idx + 1}`,
+      instruction: s.question || s.coach_say || s.screen?.info || `Execute ${s.title}`,
+      keyVerification: s.why || `SOP Requirement for ${lesson.title}`,
+      durationSeconds: 10,
+      imageUrl: getImageForScene(idx, s.title),
+    }));
+  }
+
+  return DEFAULT_AVIATION_SCENES;
+}
+
 export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
   isOpen,
   lesson,
@@ -81,8 +200,11 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(Date.now());
 
-  const currentScene = DEMONSTRATION_SCENES[currentStepIndex] || DEMONSTRATION_SCENES[0];
-  const totalSteps = DEMONSTRATION_SCENES.length;
+  // Dynamically generated scenes matching the exact active SOP lesson
+  const demonstrationScenes = getScenesForLesson(lesson);
+
+  const currentScene = demonstrationScenes[currentStepIndex] || demonstrationScenes[0];
+  const totalSteps = demonstrationScenes.length;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -91,7 +213,7 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
     setIsSequenceComplete(false);
     setPlaybackProgress(0);
     startTimeRef.current = Date.now();
-  }, [isOpen]);
+  }, [isOpen, lesson?.id]);
 
   useEffect(() => {
     if (!isOpen || !isPlaying || isSequenceComplete) {
@@ -255,7 +377,7 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
         {/* 3. TIMELINE PROGRESS BAR FOOTER */}
         <footer className="px-5 py-3 border-t border-white/[0.06] bg-black/50 shrink-0">
           <div className="grid grid-cols-4 gap-2 w-full">
-            {DEMONSTRATION_SCENES.map((sc, idx) => {
+            {demonstrationScenes.map((sc, idx) => {
               const isPassed = idx < currentStepIndex;
               const isCurrent = idx === currentStepIndex;
               const progressFill = isPassed ? 100 : isCurrent ? playbackProgress * 100 : 0;
@@ -303,13 +425,9 @@ export const ShowMeVideoModal: React.FC<ShowMeVideoModalProps> = ({
 
             {/* Center Content Matching Screenshot 1 layout */}
             <div className="flex flex-col items-center justify-center text-center max-w-md my-auto space-y-5">
-              {/* Animated Progress Ring Spinner */}
-              <div className="relative w-20 h-20 flex items-center justify-center mb-2">
-                <div className="absolute inset-0 rounded-full border-4 border-white/15"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 border-r-indigo-400 animate-spin"></div>
-                <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                  <CheckCircle2 size={22} />
-                </div>
+              {/* Clean Tick Mark (Checkmark) Icon Badge - No spinning circles */}
+              <div className="w-20 h-20 rounded-full bg-indigo-500/20 border border-indigo-500/35 text-indigo-400 flex items-center justify-center mb-2 shadow-xl shadow-indigo-500/20 backdrop-blur-md">
+                <Check size={42} className="stroke-[3]" />
               </div>
 
               {/* Headline - Replaced "Analyzing document..." with "Completed document..." */}
