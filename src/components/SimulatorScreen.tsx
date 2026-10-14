@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Check, X, Sparkles, BookOpen, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Check, X, Sparkles, BookOpen, ShieldCheck, RefreshCw, Lightbulb, Shield } from 'lucide-react';
 import { SIMULATION_STEPS, SIMULATION_STEPS_B } from '../data/lessonsData';
 import { SimulatorStep, Lesson, SourceMeta } from '../types';
 import AskTrainerModal from './AskTrainerModal';
@@ -672,9 +672,62 @@ export default function SimulatorScreen({
           <section className="action">
             {renderVisualSlot(step)}
 
-            <h3 className="question">{typedQuestion}</h3>
+            {/* Primary Action Directive Headline */}
+            <div className="mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-[10px] font-black uppercase tracking-wider text-indigo-300 shadow-sm mb-1.5">
+                <Shield size={12} className="text-indigo-400" />
+                <span>OPERATIONAL ACTION DIRECTIVE</span>
+              </div>
+              <h3 className="question text-slate-100 font-bold leading-tight">{typedQuestion}</h3>
+            </div>
 
-            {/* Choices Grid */}
+            {/* STRUCTURALLY DIFFERENTIATED MODULE 1: Operational Rationale & Cause-and-Effect */}
+            {step.why && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#1b1133] to-[#120a24] border border-[#533088]/80 text-purple-100 my-3 shadow-lg relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-600/10 rounded-full blur-xl pointer-events-none" />
+                <div className="flex items-start gap-3 relative z-10">
+                  <div className="w-9 h-9 rounded-xl bg-[#3B1E6D] text-purple-300 flex items-center justify-center shrink-0 mt-0.5 shadow-md border border-purple-500/30">
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-md border border-purple-500/30">
+                        OPERATIONAL RATIONALE · WHY THIS MATTERS
+                      </span>
+                      <span className="text-[10px] font-bold text-purple-400">Risk Prevention</span>
+                    </div>
+                    <p className="text-xs font-medium text-purple-100 leading-relaxed mt-1">
+                      {step.why}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STRUCTURALLY DIFFERENTIATED MODULE 2: On-the-Floor Practice & Watch-outs */}
+            {step.coachTip && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0b261b] to-[#061811] border border-[#196B4C]/80 text-emerald-100 my-3 shadow-lg relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-600/10 rounded-full blur-xl pointer-events-none" />
+                <div className="flex items-start gap-3 relative z-10">
+                  <div className="w-9 h-9 rounded-xl bg-[#144A36] text-emerald-300 flex items-center justify-center shrink-0 mt-0.5 shadow-md border border-emerald-500/30">
+                    <Lightbulb size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                        ON-THE-FLOOR PRACTICE · FIELD WATCH-OUT
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-400">Practical Application</span>
+                    </div>
+                    <p className="text-xs font-medium text-emerald-100 leading-relaxed mt-1">
+                      {step.coachTip}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Choices Grid with Visual Decision Gate Badges */}
             {(!step?.choices || step.choices.length < 2 || !step.choices.some((c) => c.isCorrect)) ? (
               <div className="p-4 bg-red-950/80 border border-red-500/50 rounded-2xl text-red-200 text-xs font-bold space-y-1 my-2">
                 <div className="font-extrabold uppercase tracking-wider text-red-400">Step Validation Error</div>
@@ -693,6 +746,12 @@ export default function SimulatorScreen({
                     choiceStateClass = 'disabled';
                   }
 
+                  // Determine if choice represents an explicit operational decision
+                  const titleLower = choice.title.toLowerCase();
+                  const isAcceptChoice = titleLower.includes('accept') || titleLower.includes('pass') || titleLower.includes('confirm');
+                  const isRejectChoice = titleLower.includes('reject') || titleLower.includes('fail') || titleLower.includes('decline') || titleLower.includes('prohibited');
+                  const isPauseChoice = titleLower.includes('pause') || titleLower.includes('hold') || titleLower.includes('escalate');
+
                   return (
                     <button
                       key={choice.id}
@@ -709,9 +768,26 @@ export default function SimulatorScreen({
                         (selectedChoiceId !== null && phase === 2)
                       }
                     >
-                      <div>
-                        <strong>{choice.title}</strong>
-                        {choice.subtitle && <small>{choice.subtitle}</small>}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {isAcceptChoice && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[9px] font-black uppercase">
+                              ACCEPT / PASS
+                            </span>
+                          )}
+                          {isRejectChoice && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/40 text-[9px] font-black uppercase">
+                              REJECT / FAIL
+                            </span>
+                          )}
+                          {isPauseChoice && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase">
+                              PAUSE / ESCALATE
+                            </span>
+                          )}
+                          <strong className="text-sm font-bold text-slate-100">{choice.title}</strong>
+                        </div>
+                        {choice.subtitle && <small className="text-xs text-slate-400 font-medium block">{choice.subtitle}</small>}
                       </div>
 
                       {isSelected && (

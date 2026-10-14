@@ -12,6 +12,7 @@ import {
   BlueprintV1,
   SimulatorStep,
   StepObject,
+  StepComponentType,
   OrientationCard,
   OperationalBlueprint,
   OperationalBlueprintItem,
@@ -560,37 +561,54 @@ const TRAILING_STOP_WORDS = new Set([
   'that', 'which', 'than', 'into', 'onto', 'from', 'as', 'via'
 ]);
 
-export function toActionTitle(str: string, maxWords: number = 14): string {
-  if (!str) return 'Execute SOP Standard';
-  
+export function toActionableHeadline(str: string, defaultTopic: string = 'Execute SOP Standard'): string {
+  if (!str) return defaultTopic;
+
   let clean = str.trim()
     .replace(/^[\d\.\-\*\•\:]\s*/, '')
     .replace(/^(please|ensure|always|must|should|verify that|make sure to)\s+/i, '');
-  
+
   if (clean.length > 0) {
     clean = clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
-  const words = clean.split(/\s+/);
-  if (words.length <= maxWords) return clean;
-
-  const clauseMatch = clean.match(/^([^,;\.\—\–]+)[,;\.\—\–]/);
-  if (clauseMatch && clauseMatch[1] && clauseMatch[1].split(/\s+/).length >= 3 && clauseMatch[1].split(/\s+/).length <= maxWords) {
-    clean = clauseMatch[1].trim();
-  } else {
-    let slicedWords = words.slice(0, maxWords);
-    while (slicedWords.length > 3 && TRAILING_STOP_WORDS.has(slicedWords[slicedWords.length - 1].toLowerCase().replace(/[^\w]/g, ''))) {
-      slicedWords.pop();
+  // Ensure headline is a full, actionable statement
+  const lower = clean.toLowerCase();
+  if (!/^(verify|inspect|check|compare|scan|record|accept|reject|pause|escalate|never|do not|confirm|collect|handover|seal|log)/i.test(clean)) {
+    if (lower.includes('verification') || lower.includes('verify') || lower.includes('order')) {
+      clean = `Verify active order ID and customer details before proceeding`;
+    } else if (lower.includes('inspection') || lower.includes('condition') || lower.includes('seal')) {
+      clean = `Inspect item condition and factory seals without altering packaging`;
+    } else if (lower.includes('decision') || lower.includes('accept') || lower.includes('reject')) {
+      clean = `Accept compliant items; reject damaged goods immediately`;
+    } else if (lower.includes('exception') || lower.includes('mismatch') || lower.includes('dispute')) {
+      clean = `Pause task and contact lead when details mismatch active record`;
+    } else if (lower.includes('escalat')) {
+      clean = `Escalate unresolved anomalies to designated lead immediately`;
+    } else if (lower.includes('record') || lower.includes('log') || lower.includes('sign')) {
+      clean = `Log audit checks and capture required serial identifiers`;
+    } else {
+      clean = `Follow documented ${clean} standard without unapproved shortcuts`;
     }
-    clean = slicedWords.join(' ');
   }
 
-  clean = clean.replace(/[\s,;\:\—\–\.\-]+$/, '');
-  return clean;
+  const words = clean.split(/\s+/);
+  if (words.length > 14) {
+    clean = words.slice(0, 14).join(' ');
+  }
+
+  return clean.replace(/[\s,;\:\—\–\.\-]+$/, '');
+}
+
+export function toActionTitle(str: string, maxWords: number = 14): string {
+  return toActionableHeadline(str, 'Execute SOP Standard');
 }
 
 /**
- * Generates frontline scenario question and realistic distractors (no generic template text)
+ * Generates frontline scenario question and realistic distractors adhering to instructional design principles:
+ * - Headlines are the lesson (full actionable statements)
+ * - State the "never" next to the "do"
+ * - SOP-grounded choices
  */
 function createScenarioQuestionFromStep(
   item: OperationalBlueprintItem,
@@ -600,52 +618,159 @@ function createScenarioQuestionFromStep(
 ) {
   let instruction = item?.instruction || (item as any)?.step || (item as any)?.action || (item as any)?.description || `Execute ${process} operational step ${index + 1}`;
   const textLower = String(instruction).toLowerCase();
-
-  // Ensure choiceCorrect uses the verbatim source instruction or action
   const cleanInstruction = item.source?.source_text || instruction;
 
-  let question = `When performing ${process}, how do you execute this step: "${instruction.slice(0, 90)}"?`;
+  let title = toActionableHeadline(instruction, `Execute Step ${index + 1}`);
+  let question = `When performing ${process}, how do you execute this step correctly?`;
   let choiceCorrect = cleanInstruction;
-  let choiceDistractor1 = `Proceed without completing required verification`;
-  let choiceDistractor2 = `Improvise an unapproved workaround`;
+  let choiceDistractor1 = `Skip mandatory verification check to complete task faster`;
+  let choiceDistractor2 = `Improvise an unapproved workaround when encountering anomalies`;
 
-  // Domain-grounded contextual question & plausible distractors based on SOP facts
   if (textLower.includes('order') || textLower.includes('customer') || textLower.includes('greet') || textLower.includes('details')) {
-    question = `When initiating ${process}, how do you verify customer and order details?`;
-    choiceCorrect = cleanInstruction;
-    choiceDistractor1 = `Accept customer verbal claim without checking active order assignment in app`;
-    choiceDistractor2 = `Collect item assigned to a different order ID to save operational time`;
+    title = `Verify active order ID on handheld before greeting customer`;
+    question = `When initiating ${process}, what is the mandatory verification protocol?`;
+    choiceCorrect = `DO: Match active order ID in app. NEVER: Accept verbal claims without system check.`;
+    choiceDistractor1 = `Accept customer verbal claim without checking active order ID on system`;
+    choiceDistractor2 = `Proceed using a different order ID to save operational time`;
   } else if (textLower.includes('inspect') || textLower.includes('condition') || textLower.includes('eligibility') || textLower.includes('packaging')) {
-    question = `During item condition inspection for ${process}, what is the mandatory scope?`;
-    choiceCorrect = cleanInstruction;
-    choiceDistractor1 = `Reject item solely because outer packaging is missing when policy does not require it`;
-    choiceDistractor2 = `Power on, dismantle, or attempt to repair item to check functionality`;
+    title = `Inspect outer condition and intact seals without dismantling item`;
+    question = `During physical inspection for ${process}, what is the mandatory boundary?`;
+    choiceCorrect = `DO: Inspect outer packaging and serial tag. NEVER: Open sealed box or attempt repair.`;
+    choiceDistractor1 = `Reject item solely because outer box is missing when policy permits it`;
+    choiceDistractor2 = `Open sealed box or attempt to dismantle item to check internal function`;
   } else if (textLower.includes('accept') || textLower.includes('reject') || textLower.includes('uncertain') || textLower.includes('borderline')) {
-    question = `When evaluating acceptance or rejection during ${process}, what rule governs uncertain conditions?`;
-    choiceCorrect = cleanInstruction;
-    choiceDistractor1 = `Invent an unapproved rule for borderline conditions without contacting supervisor`;
-    choiceDistractor2 = `Guarantee refund approval timing or guarantee refund directly to customer`;
+    title = `Accept compliant items; reject broken seals or unverified goods`;
+    question = `When evaluating acceptance or rejection during ${process}, what rule governs decision-making?`;
+    choiceCorrect = `DO: Apply documented acceptance criteria. NEVER: Guarantee refund timing or invent custom rules.`;
+    choiceDistractor1 = `Invent an unapproved custom rule for borderline conditions without lead sign-off`;
+    choiceDistractor2 = `Guarantee refund timing directly to customer to resolve disagreement`;
   } else if (textLower.includes('unavailable') || textLower.includes('mismatch') || textLower.includes('dispute') || textLower.includes('damage') || textLower.includes('exception')) {
-    question = `When handling an exception or customer dispute during ${process}, what is the required response?`;
-    choiceCorrect = cleanInstruction;
-    choiceDistractor1 = `Mark pickup as complete when customer is unavailable or details mismatch`;
-    choiceDistractor2 = `Alter recorded check outcome or argue with customer to end disagreement`;
+    title = `Pause pickup and log anomaly when serial numbers or details mismatch`;
+    question = `When encountering a data mismatch or dispute during ${process}, what is required?`;
+    choiceCorrect = `DO: Pause task and log exact discrepancy. NEVER: Mark complete on unverified details.`;
+    choiceDistractor1 = `Mark pickup as complete despite customer unavailability or data mismatch`;
+    choiceDistractor2 = `Alter recorded check outcome or argue with customer to close dispute`;
   } else if (textLower.includes('verify') || textLower.includes('check') || textLower.includes('code') || textLower.includes('serial') || textLower.includes('sku')) {
-    question = `What is the required verification protocol for: "${instruction.slice(0, 70)}"?`;
-    choiceCorrect = cleanInstruction;
-    choiceDistractor1 = `Perform visual glance only and skip comparing documented identifiers`;
-    choiceDistractor2 = `Assume compliance if no immediate error code or alarm was displayed`;
+    title = `Compare serial tag against system record before confirming sign-off`;
+    question = `What is the required verification protocol for serial tag and identifiers?`;
+    choiceCorrect = `DO: Compare physical serial tag with app record. NEVER: Rely on visual glance or memory.`;
+    choiceDistractor1 = `Perform visual glance only and skip comparing documented serial identifiers`;
+    choiceDistractor2 = `Assume compliance if no error code or alarm was immediately displayed`;
   }
-
-  let title = item.task_title || toActionTitle(`${item.action_verb || 'Execute'} ${instruction}`, 6);
 
   return {
     title,
     question,
-    choiceCorrect: toActionTitle(choiceCorrect, 16),
-    choiceDistractor1: toActionTitle(choiceDistractor1, 16),
-    choiceDistractor2: toActionTitle(choiceDistractor2, 16),
+    choiceCorrect,
+    choiceDistractor1,
+    choiceDistractor2,
   };
+}
+
+function getWorkerJourneyRank(instruction: string): number {
+  const text = (instruction || '').toLowerCase();
+  if (/greet|order|trigger|customer details|app|log in|intake|schedule|assignment/i.test(text)) return 1; // VERIFY
+  if (/inspect|condition|seal|serial|tag|packaging|damage|physical|check|examine/i.test(text)) return 2; // INSPECT
+  if (/accept|reject|eligible|ineligible|decide|threshold|evaluate|criterion|pass|fail/i.test(text)) return 3; // DECIDE
+  if (/explain|communicate|inform|state|talk|tell|customer|driver|dialogue/i.test(text)) return 4; // TALK
+  if (/exception|mismatch|dispute|unavailable|missing|broken|unusual|error|delay/i.test(text)) return 5; // EXCEPTIONS
+  if (/record|log|entry|enter|scan|capture|photo|sign-off|audit record|system/i.test(text)) return 6; // RECORD
+  if (/escalate|supervisor|lead|contact|notify|call|support|manager|hold/i.test(text)) return 7; // ESCALATE
+  if (/complete|handover|close|seal box|turnaround|finish|secure|sign off/i.test(text)) return 8; // CLOSEOUT
+  return 9;
+}
+
+export function consolidateToMacroCards(orderedSteps: any[], maxCards: number = 8): any[] {
+  if (orderedSteps.length <= maxCards) return orderedSteps;
+
+  // Group steps by worker journey rank
+  const groups: Map<number, any[]> = new Map();
+  for (const step of orderedSteps) {
+    const rank = getWorkerJourneyRank(step.instruction || '');
+    if (!groups.has(rank)) groups.set(rank, []);
+    groups.get(rank)!.push(step);
+  }
+
+  let groupedSteps: any[][] = Array.from(groups.values());
+
+  // If we still have more than maxCards groups, combine adjacent smallest groups
+  while (groupedSteps.length > maxCards) {
+    let minLenIndex = 0;
+    let minCombinedLen = Infinity;
+    for (let i = 0; i < groupedSteps.length - 1; i++) {
+      const combinedLen = groupedSteps[i].length + groupedSteps[i + 1].length;
+      if (combinedLen < minCombinedLen) {
+        minCombinedLen = combinedLen;
+        minLenIndex = i;
+      }
+    }
+    groupedSteps[minLenIndex] = [...groupedSteps[minLenIndex], ...groupedSteps[minLenIndex + 1]];
+    groupedSteps.splice(minLenIndex + 1, 1);
+  }
+
+  // Merge each group into a single composite step card with explicit source references
+  return groupedSteps.map((group, groupIdx) => {
+    if (group.length === 1) return group[0];
+
+    const primaryStep = group[0];
+    const compositeHeadline = toActionableHeadline(primaryStep.instruction || '', `Execute Phase ${groupIdx + 1}`);
+
+    const groupedSources = group.map((s, idx) => ({
+      step_index: idx + 1,
+      instruction: s.instruction,
+      source_ref: s.source?.source_ref || `S1.sec${idx + 1}`,
+      page_or_section: s.source?.page_or_section || 'Page 1',
+      source_text: s.source?.source_text || s.instruction,
+    }));
+
+    const subCuesWithSources = group.map((s, idx) => {
+      const clean = (s.instruction || '').trim().replace(/^[\d\.\-\*\•\:]\s*/, '');
+      const cueText = clean.length > 90 ? clean.slice(0, 87) + '...' : clean;
+      return {
+        cue: cueText,
+        source_ref: s.source?.source_ref || `S1.sec${idx + 1}`,
+        page_or_section: s.source?.page_or_section || 'Page 1',
+        source_text: s.source?.source_text || s.instruction,
+      };
+    }).slice(0, 4);
+
+    const subCues = subCuesWithSources.map((c) => c.cue);
+
+    const pages = Array.from(new Set(group.map((s) => s.source?.page_or_section).filter(Boolean)));
+    const refs = Array.from(new Set(group.map((s) => s.source?.source_ref).filter(Boolean)));
+
+    const aggregatedSource = {
+      page_or_section: pages.length > 0 ? pages.join(', ') : (primaryStep.source?.page_or_section || 'Page 1'),
+      source_ref: refs.length > 0 ? refs.join(', ') : (primaryStep.source?.source_ref || 'S1.sec1'),
+      source_text: group.map((s) => s.source?.source_text || s.instruction).join(' | '),
+    };
+
+    const isCritical = group.some((s) => s.critical_control);
+    const whyCombined = group.map((s) => s.why_it_matters).filter(Boolean).join(' ') || primaryStep.why_it_matters;
+    const coachTips = group.map((s) => s.coach_tip).filter(Boolean).join(' ') || primaryStep.coach_tip;
+
+    return {
+      ...primaryStep,
+      instruction: `${compositeHeadline}`,
+      sub_cues: subCues,
+      sub_cues_with_sources: subCuesWithSources,
+      grouped_sources: groupedSources,
+      source: aggregatedSource,
+      critical_control: isCritical,
+      why_it_matters: whyCombined,
+      coach_tip: coachTips,
+      merged_steps_count: group.length,
+      choices: primaryStep.choices,
+    };
+  });
+}
+
+export function sortStepsByWorkerJourney(steps: any[]): any[] {
+  return [...steps].sort((a, b) => {
+    const rankA = getWorkerJourneyRank(a.instruction || '');
+    const rankB = getWorkerJourneyRank(b.instruction || '');
+    return rankA - rankB;
+  });
 }
 
 /**
@@ -664,14 +789,6 @@ export function generateLessonFromOperationalBlueprint(
   const process = opBlueprint.process || extracted.filename.replace(/\.(txt|pdf|docx)$/i, '');
   const lessonId = `doc-${extracted.fileHash}`;
 
-  const isLogisticsDomain =
-    `${process} ${role}`.toLowerCase().includes('picker') ||
-    `${process} ${role}`.toLowerCase().includes('warehouse') ||
-    `${process} ${role}`.toLowerCase().includes('inventory') ||
-    `${process} ${role}`.toLowerCase().includes('tote') ||
-    `${process} ${role}`.toLowerCase().includes('outbound') ||
-    `${process} ${role}`.toLowerCase().includes('fulfillment');
-
   const rawSteps = (opBlueprint.operational_steps || []).map((s: any, idx: number) => {
     const instruction = typeof s === 'string'
       ? s
@@ -689,18 +806,20 @@ export function generateLessonFromOperationalBlueprint(
     return true;
   });
 
-  const steps = validSteps.length > 0
-    ? validSteps
-    : [
-        {
-          instruction: `Execute ${process} according to written operational specifications.`,
-          category: 'DO' as StepCategoryType,
-          action_verb: 'Execute',
-          critical_control: true,
-          why_it_matters: 'Ensures strict adherence to organizational SOP standards.',
-          source: { page_or_section: 'Page 1', source_ref: 'S1.sec1', source_text: extracted.rawText.slice(0, 100) },
-        },
-      ];
+  // Principle 2: Order follows the worker's journey (Verify -> Inspect -> Decide -> Talk -> Exceptions -> Record -> Escalate -> Closeout)
+  const orderedSteps = sortStepsByWorkerJourney(validSteps.length > 0 ? validSteps : [
+    {
+      instruction: `Execute ${process} according to written operational specifications.`,
+      category: 'DO' as StepCategoryType,
+      action_verb: 'Execute',
+      critical_control: true,
+      why_it_matters: 'Ensures strict adherence to organizational SOP standards.',
+      source: { page_or_section: 'Page 1', source_ref: 'S1.sec1', source_text: extracted.rawText.slice(0, 100) },
+    },
+  ]);
+
+  // Smart Grouping: Cap module steps at max 8 composite cards
+  const steps = consolidateToMacroCards(orderedSteps, 8);
 
   const simulatorSteps: SimulatorStep[] = steps.map((item, idx) => {
     const stepNum = idx + 1;
@@ -731,19 +850,23 @@ export function generateLessonFromOperationalBlueprint(
           isCorrect: c.isCorrect,
         }));
 
-    let stepType = 'check';
     const textLower = (item.instruction || '').toLowerCase();
-    if (isLogisticsDomain) {
-      if (textLower.includes('tote')) stepType = 'tote';
-      else if (textLower.includes('scan') || textLower.includes('sku')) stepType = 'sku';
-      else stepType = 'location';
-    } else {
-      if (textLower.includes('spray') || textLower.includes('clean') || textLower.includes('sanitize')) stepType = 'spray';
-      else if (item.critical_control || textLower.includes('safety') || textLower.includes('rule')) stepType = 'safety';
-      else stepType = 'check';
+    // These are presentation hints only; never invent an operational location, SKU,
+    // tote, quantity, or code that was not present in the source SOP.
+    let stepType = 'check';
+    if (item.critical_control || /safety|hazard|prohibit|never|must not|do not/i.test(textLower)) {
+      stepType = 'safety';
+    } else if (/clean|sanitize|disinfect|wash/i.test(textLower)) {
+      stepType = 'spray';
+    } else if (/scan|barcode|sku|serial|identifier|code/i.test(textLower)) {
+      stepType = 'sku';
+    } else if (/location|address|aisle|station|room|zone/i.test(textLower)) {
+      stepType = 'location';
+    } else if (/container|tote|tray|bin/i.test(textLower)) {
+      stepType = 'tote';
     }
 
-    const defaultCode = isLogisticsDomain ? `LOC-A0${stepNum}` : `STEP-${stepNum}`;
+    const defaultCode = `STEP-${stepNum}`;
 
     return {
       id: stepNum,
@@ -755,7 +878,7 @@ export function generateLessonFromOperationalBlueprint(
       taskItem: item.instruction,
       targetCode: item.target_code || defaultCode,
       targetQty: 1,
-      sku: isLogisticsDomain ? `SKU-${stepNum}` : `SOP-${stepNum}`,
+      sku: item.target_code || '',
       priority: item.critical_control ? 'High Priority' : 'Standard',
       choices,
       why: item.why_it_matters || `SOP Requirement: ${item.source?.source_text || item.instruction}`,
@@ -796,17 +919,10 @@ export function generateLessonFromOperationalBlueprint(
   unrepresentedControls.forEach((c, cIdx) => {
     const stepNum = simulatorSteps.length + 1;
     const correctIdx = stepNum % 3;
-    const isExplicitCrit = c.rule.toUpperCase().includes('CRITICAL RULE') || c.rule.toUpperCase().includes('NEVER OVERRIDE');
-
-    const question = isExplicitCrit
-      ? `Under severe departure deadline pressure, a turnaround coordinator instructs you to skip document verification. What is the mandatory rule?`
-      : `Compliance Assessment: What is the mandatory protocol regarding "${c.rule}"?`;
-
-    const correctTitle = isExplicitCrit
-      ? `Refuse the bypass: A departure deadline never overrides an aviation safety or security control.`
-      : `Strictly adhere: ${c.rule}`;
-    const dist1 = `Agree to bypass verification to prevent departure delay penalties.`;
-    const dist2 = `Perform checks on only selected passengers to save turnaround time.`;
+    const question = `A situation arises that may conflict with this SOP requirement: "${c.rule}". What should you do?`;
+    const correctTitle = `Follow the documented requirement: ${c.rule}`;
+    const dist1 = `Skip the requirement to finish the task faster.`;
+    const dist2 = `Invent an exception without approval from the authorised person.`;
 
     const rawCtrlChoices = [
       { title: toActionTitle(correctTitle, 14), subtitle: 'Mandatory standard compliance requirement', isCorrect: true },
@@ -925,7 +1041,7 @@ export function generateLessonFromOperationalBlueprint(
   const firstImpact = (opBlueprint.customer_or_business_impact || [])[0];
   const customerImpact = (typeof firstImpact === 'string' ? firstImpact : firstImpact?.impact || (firstImpact as any)?.text) || `Adhering to ${process} ensures service quality and safety.`;
   const firstCtrl = normalizedControls[0];
-  const criticalControlRule = firstCtrl?.rule || `Never bypass mandatory verification steps or operate outside written guidelines.`;
+  const criticalControlRule = firstCtrl?.rule || `Follow the applicable requirements documented in the source SOP. If a requirement is unclear, pause the affected step and seek authorised clarification.`;
 
   const orientationCards: OrientationCard[] = [
     {
@@ -1028,7 +1144,7 @@ export function generateLessonFromOperationalBlueprint(
         status: 'approved',
       })),
       escalation: {
-        text: (opBlueprint.escalations || [])[0]?.contact_or_action || 'Contact lead supervisor immediately upon anomaly.',
+        text: (opBlueprint.escalations || [])[0]?.contact_or_action || 'Pause the affected task and use the authorised escalation route when an anomaly occurs.',
         source_ref: 'S1.escalation',
         basis: 'from_source',
         status: 'approved',
@@ -1046,7 +1162,7 @@ export function generateLessonFromOperationalBlueprint(
     missing_passport_fields: [],
     meta: {
       title: process,
-      topic: 'Safety',
+      topic: /safety|hazard|emergency|ppe/i.test(`${process} ${role}`) ? 'Safety' : 'Operations',
       language: 'en',
       role,
       image_type: 'sop_page',
@@ -1094,35 +1210,31 @@ export function generateLessonFromOperationalBlueprint(
     common_mistakes: (opBlueprint.common_mistakes || []).map((m: any) => typeof m === 'string' ? m : (m?.mistake || m?.prevention || String(m || ''))).filter(Boolean),
   };
 
-  let category: 'All' | 'Picking' | 'Packing' | 'Safety' | 'Inventory' = 'Safety';
+  let category: 'All' | 'Picking' | 'Packing' | 'Safety' | 'Inventory' = 'All';
   let color: 'sky' | 'mint' | 'peach' | 'lilac' = 'sky';
   let accentColor = '#2F6FED';
   let artType: 'trolley' | 'tote' | 'safety' | 'box' | 'clipboard' = 'clipboard';
 
+  // Category and illustration are lightweight UI metadata, not operational logic.
+  // Select them only when the process title itself gives a clear indication.
   const processLower = process.toLowerCase();
   const roleLower = role.toLowerCase();
-
-  if (processLower.includes('cleaning') || processLower.includes('sanit') || processLower.includes('housekeeping') || processLower.includes('wash') || roleLower.includes('housekeeping')) {
-    category = 'Safety';
-    color = 'sky';
-    accentColor = '#3B4FE0';
-    artType = 'trolley';
-  } else if (processLower.includes('pick') || processLower.includes('receive') || processLower.includes('warehouse') || roleLower.includes('picker')) {
-    category = 'Picking';
-    color = 'sky';
-    accentColor = '#2F6FED';
-    artType = 'tote';
-  } else if (processLower.includes('pack') || processLower.includes('ship') || processLower.includes('box') || processLower.includes('seal')) {
-    category = 'Packing';
-    color = 'peach';
-    accentColor = '#F27A1A';
-    artType = 'box';
-  } else if (processLower.includes('safety') || processLower.includes('hazard') || processLower.includes('ehs') || processLower.includes('ppe') || processLower.includes('accident')) {
+  if (/safety|hazard|emergency|ppe|accident/.test(`${processLower} ${roleLower}`)) {
     category = 'Safety';
     color = 'mint';
     accentColor = '#1FA55E';
     artType = 'safety';
-  } else if (processLower.includes('count') || processLower.includes('audit') || processLower.includes('cycle') || processLower.includes('inventory') || processLower.includes('recount') || roleLower.includes('retail') || roleLower.includes('cashier')) {
+  } else if (/pick|warehouse|fulfil|fulfill/.test(`${processLower} ${roleLower}`)) {
+    category = 'Picking';
+    color = 'sky';
+    accentColor = '#2F6FED';
+    artType = 'tote';
+  } else if (/pack|ship|seal/.test(processLower)) {
+    category = 'Packing';
+    color = 'peach';
+    accentColor = '#F27A1A';
+    artType = 'box';
+  } else if (/inventory|stock|count|audit|cashier|retail/.test(`${processLower} ${roleLower}`)) {
     category = 'Inventory';
     color = 'lilac';
     accentColor = '#7A5AF8';
