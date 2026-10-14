@@ -8,6 +8,8 @@
 
 import { OperationalBlueprint, Lesson, SopKnowledgeModel, SourceMeta } from '../types';
 
+export type ProvenanceCategory = 'VERBATIM_SOURCE' | 'STRUCTURED_INTERPRETATION' | 'ENGINE_INFERENCE' | 'UNRESOLVED';
+
 export interface CanonicalSourceRef {
   pageOrSection: string;
   sourceRef: string;
@@ -17,6 +19,7 @@ export interface CanonicalSourceRef {
 export interface CanonicalPrerequisite {
   id: string;
   text: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -25,6 +28,7 @@ export interface CanonicalToolOrSystem {
   name: string;
   purpose: string;
   neverDo?: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -41,6 +45,7 @@ export interface CanonicalStep {
   choices?: { id: string; title: string; subtitle: string; isCorrect: boolean }[];
   coachTip?: string;
   hint?: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -50,7 +55,7 @@ export interface CanonicalControlRule {
   rationale?: string;
   type: 'safety' | 'quality' | 'compliance';
   isCritical: boolean;
-  provenance?: 'explicit_source' | 'engine_inferred';
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -61,6 +66,7 @@ export interface CanonicalDecisionPoint {
   compliantAction: string;
   prohibitedAction?: string;
   rationale: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -70,6 +76,7 @@ export interface CanonicalExceptionRule {
   trigger: string;
   resolutionOrAction: string;
   target?: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -77,6 +84,7 @@ export interface CanonicalProhibitedAction {
   id: string;
   mistake: string;
   prevention: string;
+  provenance: ProvenanceCategory;
   source: CanonicalSourceRef;
 }
 
@@ -101,6 +109,10 @@ export interface CanonicalTaskModel {
   decisions: CanonicalDecisionPoint[];
   exceptionsAndEscalations: CanonicalExceptionRule[];
   prohibitedActions: CanonicalProhibitedAction[];
+
+  qualityAuditCriteria?: { id: string; criteria: string; provenance: ProvenanceCategory; source: CanonicalSourceRef }[];
+  evidenceRequired?: { id: string; description: string; provenance: ProvenanceCategory; source: CanonicalSourceRef }[];
+  unresolvedGaps?: { topic: string; description: string; sourceRef?: string; isBlocking?: boolean }[];
 
   rawText?: string;
   sourceMeta?: SourceMeta;
@@ -168,6 +180,7 @@ export function buildCanonicalTaskModel(
   const prerequisites: CanonicalPrerequisite[] = (blueprint?.prerequisites || []).map((p, idx) => ({
     id: `prereq-${idx + 1}`,
     text: clean(p.text),
+    provenance: (p.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION') as ProvenanceCategory,
     source: {
       pageOrSection: p.source_ref || 'Prerequisites',
       sourceRef: p.source_ref || 'SOP Section 1',
@@ -181,6 +194,7 @@ export function buildCanonicalTaskModel(
     name: clean(t.name),
     purpose: clean(t.purpose),
     neverDo: t.never_do ? clean(t.never_do) : undefined,
+    provenance: (t.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION') as ProvenanceCategory,
     source: {
       pageOrSection: t.source_ref || 'Tools & Equipment',
       sourceRef: t.source_ref || 'SOP Section 2',
@@ -204,6 +218,7 @@ export function buildCanonicalTaskModel(
         choices: s.choices,
         coachTip: s.coach_tip,
         hint: s.hint,
+        provenance: (s.source?.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION') as ProvenanceCategory,
         source: {
           pageOrSection: s.source?.page_or_section || `Step ${idx + 1}`,
           sourceRef: s.source?.source_ref || `SOP Step ${idx + 1}`,
@@ -220,6 +235,7 @@ export function buildCanonicalTaskModel(
         whyItMatters: so.why,
         coachTip: so.coach_say,
         hint: so.hint,
+        provenance: 'STRUCTURED_INTERPRETATION' as const,
         source: {
           pageOrSection: `Step ${idx + 1}`,
           sourceRef: `SOP Step ${idx + 1}`,
@@ -243,6 +259,7 @@ export function buildCanonicalTaskModel(
         instruction: clean(l),
         category: 'DO',
         actionVerb: 'Execute',
+        provenance: 'VERBATIM_SOURCE',
         source: {
           pageOrSection: `Line ${idx + 1}`,
           sourceRef: `SOP Line ${idx + 1}`,
@@ -267,7 +284,7 @@ export function buildCanonicalTaskModel(
         rationale: (typeof c === 'object' && c?.rationale) ? clean(c.rationale) : undefined,
         type: 'compliance',
         isCritical: true,
-        provenance: isExplicit ? 'explicit_source' : 'engine_inferred',
+        provenance: isExplicit ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
         source: {
           pageOrSection: (typeof c === 'object' && c?.source_ref) || 'Critical Controls',
           sourceRef: (typeof c === 'object' && c?.source_ref) || 'SOP Controls',
@@ -286,7 +303,7 @@ export function buildCanonicalTaskModel(
         rule: clean(rule),
         type: 'safety',
         isCritical: isExplicit || clean(rule).toLowerCase().includes('lethal') || clean(rule).toLowerCase().includes('chloramine') || clean(rule).toLowerCase().includes('emergency'),
-        provenance: isExplicit ? 'explicit_source' : 'engine_inferred',
+        provenance: isExplicit ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
         source: {
           pageOrSection: (typeof s === 'object' && s?.source_ref) || 'Safety Rules',
           sourceRef: (typeof s === 'object' && s?.source_ref) || 'SOP Safety',
@@ -304,7 +321,7 @@ export function buildCanonicalTaskModel(
         rule: clean(rule),
         type: 'quality',
         isCritical: false,
-        provenance: 'engine_inferred',
+        provenance: 'STRUCTURED_INTERPRETATION',
         source: {
           pageOrSection: (typeof q === 'object' && q?.source_ref) || 'Quality Rules',
           sourceRef: (typeof q === 'object' && q?.source_ref) || 'SOP Quality',
@@ -323,6 +340,7 @@ export function buildCanonicalTaskModel(
       condition: clean(d.decision || d.situation),
       compliantAction: clean(d.action),
       rationale: clean(d.source_text || d.action),
+      provenance: d.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
       source: {
         pageOrSection: d.source_ref || 'Decision Points',
         sourceRef: d.source_ref || 'SOP Decisions',
@@ -339,6 +357,7 @@ export function buildCanonicalTaskModel(
         type: 'exception',
         trigger: clean(e.trigger),
         resolutionOrAction: clean(e.resolution),
+        provenance: e.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
         source: {
           pageOrSection: e.source_ref || 'Exceptions',
           sourceRef: e.source_ref || 'SOP Exceptions',
@@ -356,6 +375,7 @@ export function buildCanonicalTaskModel(
         trigger: clean(esc.situation),
         resolutionOrAction: clean(esc.contact_or_action),
         target: clean(esc.contact_or_action),
+        provenance: esc.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
         source: {
           pageOrSection: esc.source_ref || 'Escalations',
           sourceRef: esc.source_ref || 'SOP Escalations',
@@ -372,6 +392,7 @@ export function buildCanonicalTaskModel(
       id: `prohib-${idx + 1}`,
       mistake: clean(m.mistake),
       prevention: clean(m.prevention),
+      provenance: m.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION',
       source: {
         pageOrSection: m.source_ref || 'Prohibited Actions',
         sourceRef: m.source_ref || 'SOP Prohibited Actions',
@@ -379,15 +400,58 @@ export function buildCanonicalTaskModel(
       },
     }));
 
+  // 8. Quality Audit Criteria
+  const qualityAuditCriteria = (blueprint?.quality_rules || []).map((q: any, idx) => {
+    const criteria = typeof q === 'string' ? q : (q?.rule || q?.text || q?.description || '');
+    return {
+      id: `audit-${idx + 1}`,
+      criteria: clean(criteria),
+      provenance: (typeof q === 'object' && q?.source_text ? 'VERBATIM_SOURCE' : 'STRUCTURED_INTERPRETATION') as ProvenanceCategory,
+      source: {
+        pageOrSection: (typeof q === 'object' && q?.source_ref) || 'Quality Criteria',
+        sourceRef: (typeof q === 'object' && q?.source_ref) || 'SOP Section 8',
+        sourceText: clean((typeof q === 'object' && (q?.source_text || q?.rule)) || criteria),
+      },
+    };
+  }).filter((q) => q.criteria.length > 0);
+
+  // 9. Evidence Required for Capability Demonstration
+  const evidenceRequired = steps
+    .filter((s) => s.criticalControl || s.category === 'CHECK' || s.category === 'RESPOND' || s.category === 'ESCALATE')
+    .map((s, idx) => ({
+      id: `ev-${idx + 1}`,
+      description: `Demonstrate compliant execution of: "${s.instruction}"`,
+      provenance: s.provenance,
+      source: s.source,
+    }));
+
   const escalationsPresent = exceptionsAndEscalations.some((e) => e.type === 'escalation');
   const ambList: { topic: string; description: string; sourceRef?: string; isBlocking?: boolean }[] = [];
+  const unresolvedGaps: { topic: string; description: string; sourceRef?: string; isBlocking?: boolean }[] = [];
+
   if (!escalationsPresent) {
-    ambList.push({
+    const gap = {
       topic: 'Escalations',
       description: 'Source document contains no explicit escalation rule or supervisor contact path.',
       isBlocking: true,
-    });
+    };
+    ambList.push(gap);
+    unresolvedGaps.push(gap);
   }
+
+  // Check if any critical control or step has unstated parameters
+  steps.forEach((s) => {
+    if (s.instruction.toLowerCase().includes('contingency') || s.instruction.toLowerCase().includes('as per policy')) {
+      const gap = {
+        topic: 'External Policy Reference',
+        description: `Step relies on unstated external policy: "${s.instruction}"`,
+        sourceRef: s.source.sourceRef,
+        isBlocking: false,
+      };
+      ambList.push(gap);
+      unresolvedGaps.push(gap);
+    }
+  });
 
   const confidence = Math.max(0.5, 1.0 - ambList.length * 0.15);
 
@@ -410,6 +474,9 @@ export function buildCanonicalTaskModel(
     decisions,
     exceptionsAndEscalations,
     prohibitedActions,
+    qualityAuditCriteria,
+    evidenceRequired,
+    unresolvedGaps,
     rawText: rawText || (lesson as any)?.sourceMeta?.rawText,
     sourceMeta: (lesson as any)?.sourceMeta,
     confidence,

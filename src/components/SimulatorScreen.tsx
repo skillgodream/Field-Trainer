@@ -365,16 +365,47 @@ export default function SimulatorScreen({
     return map[type?.toLowerCase()] || (priority?.toLowerCase().includes('crit') ? '!' : '▣');
   };
 
-  // Visual slot renderer (Domain-Aware Cards + Smart Visual Photo Library Matcher)
+  // Visual slot renderer (Domain-Aware Cards + Interactive Presentation Components)
   const renderVisualSlot = (currentStep: SimulatorStep) => {
     const textContext = `${currentStep.title} ${currentStep.question} ${currentStep.why || ""} ${currentStep.taskTitle || ""} ${currentStep.taskItem || ""}`;
     const overallContext = `${lesson?.title || ""} ${lesson?.category || ""} ${lesson?.description || ""}`;
     const { url } = findBestVisualMatch(textContext, overallContext);
+
+    const stepComponent = (currentStep as any).component || (currentStep.type === 'sku' || currentStep.type === 'location' ? 'code_match' : currentStep.type === 'safety' ? 'photo_hotspot' : 'choice_list');
+
+    let badgeLabel = 'SOP OPERATIONAL STEP';
+    let badgeColor = 'bg-blue-950/80 text-blue-300 border-blue-500/40';
+
+    if (stepComponent === 'code_match' || currentStep.type === 'sku' || currentStep.type === 'location') {
+      badgeLabel = 'VERIFICATION GATE · MATCH IDENTIFIERS (ORDER / SKU / SERIAL)';
+      badgeColor = 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40';
+    } else if (stepComponent === 'photo_hotspot' || currentStep.type === 'spray' || currentStep.type === 'safety') {
+      badgeLabel = 'INSPECTION GATE · PHYSICAL CONDITION & POLICY SCOPE CHECK';
+      badgeColor = 'bg-amber-950/80 text-amber-300 border-amber-500/40';
+    } else if (stepComponent === 'scene_pick') {
+      badgeLabel = 'DECISION GATE · ACCEPTANCE / REJECTION RULE EVALUATION';
+      badgeColor = 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40';
+    } else if (stepComponent === 'number_choice' || currentStep.type === 'qty') {
+      badgeLabel = 'QUANTITY & TIMING CHECK · VERIFY UNITS & SLA';
+      badgeColor = 'bg-purple-950/80 text-purple-300 border-purple-500/40';
+    }
+
     return (
-      <div className="w-full flex flex-col gap-3 mb-4">
+      <div className="w-full flex flex-col gap-2 mb-3">
+        <div className={`px-3 py-1.5 rounded-xl border ${badgeColor} text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2 shadow-sm`}>
+          <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
+          <span>{badgeLabel}</span>
+        </div>
+
         {url ? (
-          <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-slate-800 shadow-lg bg-slate-950 shrink-0">
+          <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-slate-800 shadow-lg bg-slate-950 shrink-0">
             <img src={url} alt={currentStep.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+            {currentStep.targetCode && (
+              <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-lg text-xs font-mono font-bold text-slate-200">
+                Code: {currentStep.targetCode}
+              </div>
+            )}
           </div>
         ) : null}
       </div>

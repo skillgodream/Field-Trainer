@@ -292,7 +292,8 @@ app.post('/api/gemini/generate-blueprint', async (req, res) => {
     }
 
     const parts: any[] = [];
-    const docText = rawText ? rawText.slice(0, 48000) : '';
+    // Process the full document text without arbitrary character truncation
+    const docText = rawText || '';
 
     // If text was already extracted, prioritize sending text directly (much faster and avoids payload limits)
     if (docText && docText.length > 50) {
@@ -328,39 +329,45 @@ SOP → analyse through 8 stages → identify meaningful content → remove dupl
 - Do NOT invent content to fill a stage.
 - The 8 stages control the Brain's thinking and sequencing; the SOP controls the actual content.
 
-CRITICAL ARCHITECTURAL RULES:
-1. CONCISE WORKPLACE LANGUAGE (NO RAW TEXT DUMPS):
+CRITICAL ARCHITECTURAL & INSTRUCTIONAL DESIGN RULES:
+1. INSTRUCTIONAL GROUPING (COHERENT TEACHING UNITS):
+   - Do NOT output raw 1:1 line-item dumps for every bullet point in the SOP text.
+   - Group related routine steps into coherent operational teaching units (e.g., Customer & Order Verification, Item Eligibility Inspection, Acceptance/Rejection Decision, Exception & Dispute Handling).
+   - A complex SOP should synthesize into distinct, high-impact operational steps rather than a mechanical list of cards.
+2. VISUAL PRESENTATION TYPE SELECTION (component):
+   - Assign an appropriate interactive presentation mode for EACH operational step:
+     * "code_match": For verifying or matching order ID, return ID, serial/IMEI number, barcode, or SKU code.
+     * "photo_hotspot": For inspecting physical item condition, tamper seals, liquid damage, or packaging flaws.
+     * "scene_pick": For right-vs-wrong visual comparisons (e.g. valid vs invalid return condition).
+     * "number_choice": For quantities, unit counts, wait times, or measurements.
+     * "choice_list": For general operational decisions, verbal protocols, or exception escalation routing.
+3. CONCISE WORKPLACE LANGUAGE (NO RAW TEXT DUMPS):
    - NEVER output long, run-on paragraph sentences concatenating multiple SOP lines.
    - Summarize every choice title into a crisp, COMPLETE, 5-12 word action statement written in natural workplace language.
    - NEVER end a choice title on a dangling conjunction or preposition (e.g., 'and', 'or', 'to', 'with', 'for'). Ensure every title is a full, grammatically complete action phrase.
    - Keep scenario questions under 2 concise sentences focused on a single execution dilemma.
-2. DEEP REALISM & UNCOMPROMISING SPECIFICITY:
+4. DEEP REALISM & UNCOMPROMISING SPECIFICITY:
    - Ground ALL extractions strictly in the operational facts of the provided SOP document.
-   - Extract the TRUE frontline role (e.g. Quick Commerce Picker, Phlebotomist, Residential Housekeeping Specialist, Retail Cashier, Primary School Teacher, Aviation Gate Agent).
-   - Every scenario question must put the worker in a concrete, high-stakes operational situation directly based on the SOP details (specific equipment, classroom prep, barcodes, shelf codes, temperatures, error codes, edge cases, exceptions).
-   - NEVER generate generic questions like "What is your required action?" or "How should you complete this task?" or "Before taking the next step, what details must you verify?".
+   - Extract the TRUE frontline role (e.g. Pickup Associate, Delivery Partner, Quick Commerce Picker, Phlebotomist, Retail Cashier).
+   - Every scenario question must put the worker in a concrete, high-stakes operational situation directly based on the SOP details.
+   - NEVER generate generic questions like "What is your required action?" or "How should you complete this task?".
    - NEVER generate generic choices like "Skip step and proceed" or "Use unverified shortcut". Create REALISTIC frontline errors, tempting shortcuts, and common mistakes that real workers actually make on the floor!
-3. THREE NUANCED CHOICES WITH EXPLICIT FAILURE MODES:
+5. THREE NUANCED CHOICES WITH EXPLICIT FAILURE MODES:
    - For EACH operational step, you MUST generate exactly 3 nuanced choices with short, complete, clear titles (5 to 12 words):
      * Choice 1 (isCorrect: true): Concise, complete, compliant SOP action title. Subtitle explaining why this is correct per SOP.
-     * Choice 2 (isCorrect: false): Concise, complete, tempting operational shortcut title. Subtitle explicitly details the failure consequence (e.g., inventory mismatch, customer complaint, safety hazard).
+     * Choice 2 (isCorrect: false): Concise, complete, tempting operational shortcut title. Subtitle explicitly details the failure consequence.
      * Choice 3 (isCorrect: false): Concise, complete, unapproved workaround title. Subtitle details the regulatory, safety, or quality violation.
-3. EXPERT COACH TIPS, SPECIFIC HINTS & LUCIDE VECTOR ICONS:
-   - coach_tip: Guruji's practical wisdom directly referencing the subtle details, pitfalls, or mnemonic tips from the SOP.
-   - hint: Specific reference to the SOP document section, visual cues, or indicators.
-   - target_code: Authentic code extracted from or reflecting the SOP (e.g., LOC-A02-04, SKU-88421, FORM-Q7).
-   - icon_key: Assign a domain-appropriate, clean Lucide vector icon key for each operational step, tool, and safety rule (e.g., ShieldAlert, ScanBarcode, Thermometer, Microscope, Boxes, FileCheck, Droplets, Sparkles, SprayCan, Syringe, ClipboardCheck, Users, CheckCircle, AlertTriangle, Zap, Scale, Truck, Lock, Settings). Match the icon meaningfully to the operational step — no arbitrary overfitting or underfitting.
-5. METADATA VS OPERATIONAL CONTENT:
-   - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories, ISO reference codes.
+6. EXPERT COACH TIPS, SPECIFIC HINTS & LUCIDE VECTOR ICONS:
+   - coach_tip: Guruji's practical wisdom directly referencing subtle details or compliance wisdom from the SOP.
+   - hint: Specific clue pointing directly to the relevant section or physical indicator in the SOP.
+   - target_code: Authentic code extracted from or reflecting the SOP (e.g., RET-PU-001, SKU-88421, FORM-Q7).
+   - icon_key: Assign a domain-appropriate, clean Lucide vector icon key for each operational step.
+7. METADATA VS OPERATIONAL CONTENT:
+   - METADATA (DO NOT MAKE INTO STEPS): Administrative headers, document approval tables, version histories.
    - OPERATIONAL CONTENT (MUST DRIVE BLUEPRINT): Physical actions, system entries, verbal communications, verifications, decision points, exception handling, escalations.
-6. AI VIDEO DIRECTOR RULES FOR VEO 3.2 LITE:
-   For every clip in video_demonstration_plan.clips, formulate the "veo_prompt" as a dense 65-85 word single cinematic sentence following:
-   [Visual Style] + [Detailed Subject with Active Continuous Movement] + [Enriched Background Environment] + [Studio Lighting/Mood] + [Continuous Camera Tracking]
-   - BACKGROUND ENRICHMENT: Always build a detailed, authentic physical workspace (e.g. sleek executive conference suite with frosted acoustic glass partitions, sterile clinical preparation bench with specimen centrifuge racks, modern retail checkout counter, organized staging aisle). Never leave the background blank or abstract.
-   - PACING & CONTINUOUS MOVEMENT: Use active progressive verbs (e.g., "steadily reviewing and logging", "methodically cross-verifying", "carefully inspecting with deliberate hand movements"). Actions must be continuous, steady-state, or looping to prevent abrupt cutoffs at the 8-second mark.
-   - BAN COMPLETION VERBS: Do not use verbs indicating an end state (e.g., 'closes the laptop', 'presses the button', 'sits down'). Instead mandate continuous progressive action states (e.g., 'the laptop remains open as data flows', 'finger holding down the button safely', 'seated stationary while analyzing').
-   - CAMERA WORK: End every prompt with fluid continuous camera motion (e.g., "slow cinematic lateral tracking shot gently drifting leftward", "subtle continuous forward camera drift maintaining steady focal depth").
-7. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
+8. AI VIDEO DIRECTOR RULES FOR VEO 3.2 LITE:
+   For every clip in video_demonstration_plan.clips, formulate the "veo_prompt" as a dense 65-85 word single cinematic sentence.
+9. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
 
     const textPrompt = `Uploaded SOP Document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
 ${docText ? `Document Text:\n"""\n${docText}\n"""\n` : ''}
@@ -373,8 +380,8 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
     "version": "Extracted version or empty",
     "department": "Extracted department or operations division"
   },
-  "role": "Exact worker role described in SOP (e.g., Compliance Officer, Operations Associate, Retail Cashier, Technician)",
-  "process": "Exact core operational process (e.g., Incident Intake & Logging, Order Fulfillment, Blood Sample Collection)",
+  "role": "Exact worker role described in SOP (e.g., Pickup Associate, Delivery Partner, Operations Associate)",
+  "process": "Exact core operational process (e.g., Return Pickup Workflow, Order Fulfillment)",
   "purpose": "1-2 sentence primary operational goal for the worker",
   "scope": "Applicable department or workspace boundaries",
   "prerequisites": [
@@ -388,8 +395,9 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   ],
   "operational_steps": [
     {
-      "instruction": "Specific, clear workplace action grounded in the SOP (e.g., Verify tote barcode against PDA screen before placing picked items)",
+      "instruction": "Specific, clear workplace action grounded in the SOP",
       "category": "DO" | "CHECK" | "KNOW" | "DECIDE" | "RESPOND" | "RECOVER" | "ESCALATE",
+      "component": "code_match" | "photo_hotspot" | "scene_pick" | "number_choice" | "choice_list",
       "action_verb": "Primary action verb (e.g., Scan, Verify, Inspect, Place)",
       "task_title": "Concise 2-4 word operational action title (e.g., Scan Tote Barcode, Check Expiry Date, Inspect Packaging)",
       "target_code": "Realistic barcode / SKU / rack / equipment or form code from SOP (e.g., TOTE-B12, SKU-4029, LOC-A02-04)",
@@ -469,7 +477,7 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   "confidence": 0.98
 }
 
-Generate between 5 to 9 comprehensive operational_steps covering the entire lifecycle of the SOP.`;
+The number of operational_steps must emerge naturally from the SOP's actual operational complexity. Do NOT force a fixed step count. A simple SOP should produce a concise task structure; a complex SOP must retain all distinct operational tasks without arbitrary truncation or merging.`;
 
     parts.push({ text: textPrompt });
 
@@ -613,9 +621,334 @@ app.post('/api/coach', async (req, res) => {
   }
 });
 
+// API Route: Generate Recommended Instruct Options for an SOP
+app.post('/api/sop/instruct-options', async (req, res) => {
+  try {
+    const { filename = 'SOP Document', rawText = '', wordCount = 100, pageCount = 1 } = req.body;
+    const aiClient = getGeminiClient(req);
+
+    const defaultOptions = [
+      {
+        id: 'opt-standard',
+        title: 'SOP Flow',
+        description: 'Balanced, step-by-step procedural training covering prerequisites, core execution, and verification.',
+        focusAreas: ['End-to-End Procedural Flow', 'Task Verification'],
+        recommendedSteps: 5,
+      },
+      {
+        id: 'opt-controls-exceptions',
+        title: 'Critical Controls',
+        description: 'Emphasizes high-stakes safety rules, decision criteria, exception handling, and escalation protocols.',
+        focusAreas: ['Critical Safety Controls', 'Exception Recovery'],
+        recommendedSteps: 6,
+      },
+      {
+        id: 'opt-fast-track',
+        title: 'Fast Track',
+        description: 'Concise, high-velocity frontline drill focusing strictly on core physical and system actions.',
+        focusAreas: ['Core Action Verbs', 'Fast Field Execution'],
+        recommendedSteps: 4,
+      },
+    ];
+
+    if (!aiClient) {
+      return res.json({ success: true, options: defaultOptions });
+    }
+
+    const prompt = `Analyze this SOP document: "${filename}" (${pageCount} pages, ${wordCount} words)
+Document Text:
+"""
+${(rawText || '').slice(0, 16000)}
+"""
+
+Recommend 3 distinct training structure options tailored specifically to this SOP document.
+Return JSON:
+{
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Clear 2-4 word option title (e.g. Standard Return Pickup, Critical Safety Drill)",
+      "description": "1 sentence describing the training emphasis based on the document",
+      "focusAreas": ["3 short bullet tags highlighting what this structure focuses on"],
+      "recommendedSteps": estimated integer step count
+    }
+  ]
+}`;
+
+    const response = await aiClient.models.generateContent({
+      model: MODEL_FAST,
+      contents: prompt,
+      config: {
+        systemInstruction: 'You are an expert instructional designer. Propose 3 tailored training structures grounded in the provided SOP. Respond strictly with valid JSON.',
+        responseMimeType: 'application/json',
+        temperature: 0.3,
+      },
+    });
+
+    const parsed = cleanAndRepairJson(response.text || '{}');
+    if (parsed && Array.isArray(parsed.options) && parsed.options.length > 0) {
+      return res.json({ success: true, options: parsed.options });
+    }
+
+    return res.json({ success: true, options: defaultOptions });
+  } catch (err: any) {
+    console.warn('[Server /api/sop/instruct-options error]:', err?.message);
+    return res.json({
+      success: true,
+      options: [
+        {
+          id: 'opt-standard',
+          title: 'Standard Operational Flow',
+          description: 'Balanced, step-by-step procedural training covering prerequisites, core execution, and verification.',
+          focusAreas: ['End-to-End Procedural Flow', 'Task Verification', 'Standard Operations'],
+          recommendedSteps: 5,
+        },
+        {
+          id: 'opt-controls-exceptions',
+          title: 'Critical Controls & Edge Cases',
+          description: 'Emphasizes high-stakes safety rules, decision criteria, exception handling, and escalation protocols.',
+          focusAreas: ['Critical Safety Controls', 'Exception Recovery', 'Escalations'],
+          recommendedSteps: 6,
+        },
+        {
+          id: 'opt-fast-track',
+          title: 'Fast-Track Field Drill',
+          description: 'Concise, high-velocity frontline drill focusing strictly on core physical and system actions.',
+          focusAreas: ['Core Action Verbs', 'Fast Field Execution', 'Target Barcodes/Codes'],
+          recommendedSteps: 4,
+        },
+      ],
+    });
+  }
+});
+
+// ==========================================================
+// PROGRESSIVE SOP INTELLIGENCE CHAT API ROUTES
+// ==========================================================
+
+// Stage A/B: Prompt A — Extract SOP & Generate Extraction Report
+app.post('/api/sop/extract-report', async (req, res) => {
+  try {
+    const { filename, rawText, wordCount, pageCount, fileHash, fileBase64, mimeType } = req.body;
+    const aiClient = getGeminiClient(req);
+
+    const systemInstruction = `You are analysing an uploaded operational SOP to prepare a source-grounded learning experience.
+Extract what the document actually states. Identify the purpose, ordered operational tasks, prerequisites, decisions, exceptions, critical controls, completion conditions and evidence requirements.
+Attach source references to each material requirement.
+Separate explicit requirements from interpretations, ambiguities, contradictions and missing information.
+Do not invent procedures, operational details, policy requirements or escalation authority. Do not assume a fixed number of tasks. Do not generate the learning deck at this stage.
+Return structured, schema-valid data and a concise human-readable extraction report. Report limitations honestly.`;
+
+    const textPrompt = `Analyse SOP document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
+Text:
+"""
+${(rawText || '').slice(0, 32000)}
+"""
+
+Return JSON conforming strictly to:
+{
+  "extractionReport": {
+    "documentIdentity": {
+      "filename": "${filename}",
+      "docTitle": "${(filename || 'Operational Procedure').replace(/\.(pdf|txt|docx)$/i, '')}",
+      "uploadedAt": "${new Date().toISOString()}",
+      "wordCount": ${wordCount || 100},
+      "pageCount": ${pageCount || 1}
+    },
+    "documentPurpose": "Clear, extracted document purpose from text",
+    "intendedOutcome": "Extracted primary operational outcome",
+    "extractedRequirements": [
+      {
+        "id": "req-1",
+        "type": "task" | "prerequisite" | "decision" | "exception" | "escalation" | "control" | "completion",
+        "title": "Concise requirement title",
+        "instruction": "Full instruction text",
+        "category": "DO" | "CHECK" | "DECIDE" | "RECOVER" | "ESCALATE",
+        "provenance": "VERBATIM_SOURCE",
+        "sourceRef": "Section or Page number",
+        "sourceText": "Exact quote from SOP",
+        "isCriticalControl": true/false
+      }
+    ],
+    "stepsCount": number of operational tasks,
+    "prerequisitesCount": number of prerequisites,
+    "decisionsCount": number of decision points,
+    "exceptionsCount": number of exception rules,
+    "criticalControlsCount": number of critical controls,
+    "missingInfoCount": number of missing details,
+    "contradictionsAndAmbiguities": [
+      {
+        "id": "amb-1",
+        "topic": "Topic name",
+        "description": "What is ambiguous or missing in the source",
+        "severity": "critical" | "high" | "medium" | "low",
+        "sourceRef": "Section name",
+        "isBlocking": true/false
+      }
+    ],
+    "coverageStatus": {
+      "isComplete": true,
+      "wordCount": ${wordCount || 100},
+      "pageCount": ${pageCount || 1}
+    }
+  },
+  "unresolvedIssues": [
+    {
+      "id": "issue-1",
+      "category": "safety" | "conflict" | "decision_criteria" | "completion" | "training_preference",
+      "description": "Description of unresolved issue",
+      "severity": "high" | "medium" | "low",
+      "isBlocking": false,
+      "resolved": false
+    }
+  ],
+  "clarificationQuestions": [
+    {
+      "questionId": "q-1",
+      "questionText": "Targeted question to clarify unstated or ambiguous detail",
+      "reason": "Why this question matters for training structure",
+      "category": "decision_criteria",
+      "sourceRef": "Section ref",
+      "isMandatory": false,
+      "consequenceOfLeavingUnanswered": "What happens if skipped",
+      "status": "pending",
+      "options": [
+        { "id": "opt-1", "label": "Option label", "isCompliantWithSource": true }
+      ]
+    }
+  ]
+}`;
+
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true, reason: 'No API key on server' });
+    }
+
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: textPrompt,
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+        temperature: 0.2,
+      },
+    });
+
+    const parsed = cleanAndRepairJson(response.text || '{}');
+    return res.json({ success: true, ...parsed });
+  } catch (err: any) {
+    console.warn('[Server /api/sop/extract-report error]:', err?.message);
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+
+// Stage C: Prompt B — Adaptive Clarification Chat
+app.post('/api/sop/clarification-chat', async (req, res) => {
+  try {
+    const { session, latestAnswer } = req.body;
+    const aiClient = getGeminiClient(req);
+
+    const systemInstruction = `You are clarifying the interpretation of an already-extracted SOP.
+Use the current extraction report, unresolved issues, previous answers and approved supplementary instructions.
+Ask only questions that materially affect correct task execution, safety, source interpretation, learning structure or assessment validity.
+Prioritize critical issues. Ask the minimum number of useful questions. Do not ask for information already established by the source or a previous answer.
+Never invent a missing process rule. If an answer introduces a new rule, record it as supplementary information. If it conflicts with a source requirement or exceeds the user's apparent authority, flag it for resolution instead of silently accepting it.
+Return the next question, its reason, supporting references, answer options where useful, mandatory status and the updated unresolved-issues list.`;
+
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true });
+    }
+
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: `Session State:\n${JSON.stringify(session).slice(0, 16000)}\nLatest Answer:\n${JSON.stringify(latestAnswer)}`,
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
+    });
+
+    const parsed = cleanAndRepairJson(response.text || '{}');
+    return res.json({ success: true, ...parsed });
+  } catch (err: any) {
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+
+// Stage D: Prompt C — Learning Blueprint Generation
+app.post('/api/sop/generate-blueprint', async (req, res) => {
+  try {
+    const { session, filename, rawText, extractionReport, supplementaryInstructions } = req.body;
+    const aiClient = getGeminiClient(req);
+
+    const systemInstruction = `Create a learning blueprint from the validated SOP interpretation, the existing Canonical Task Model and approved clarification records.
+Preserve operational order, prerequisites, decision criteria, exceptions, critical controls and completion conditions.
+Map every proposed task and learning objective to its CTM requirement identifiers.
+Identify any requirement that cannot yet be taught or assessed reliably.
+Do not add unsupported procedural details. Do not omit critical controls for the sake of brevity. Do not generate the final four learning experiences until the blueprint is explicitly approved and all mandatory validations pass.`;
+
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true });
+    }
+
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: `SOP: ${filename}\nReport:\n${JSON.stringify(extractionReport).slice(0, 8000)}\nSupplementary:\n${JSON.stringify(supplementaryInstructions)}`,
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+      },
+    });
+
+    const parsed = cleanAndRepairJson(response.text || '{}');
+    return res.json({ success: true, learningBlueprint: parsed.learningBlueprint || parsed });
+  } catch (err: any) {
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+
+// Stage Transition & Approval Enforcement
+app.post('/api/sop/approve-and-generate', async (req, res) => {
+  try {
+    const { session, approvedBy = 'Operations Reviewer' } = req.body;
+
+    if (!session) {
+      return res.status(400).json({ success: false, error: 'Missing session data' });
+    }
+
+    // Server-side enforcement: Check stage and unresolved blocking gaps
+    if (session.currentStage !== 'BLUEPRINT_REVIEW' && session.currentStage !== 'APPROVED_FOR_GENERATION') {
+      return res.status(422).json({
+        success: false,
+        error: `Stage transition rejected: Cannot generate training deck from stage '${session.currentStage}'. Explicit blueprint review is required.`,
+      });
+    }
+
+    const blockingIssues = (session.unresolvedIssues || []).filter((i: any) => i.isBlocking && !i.resolved);
+    if (blockingIssues.length > 0) {
+      return res.status(422).json({
+        success: false,
+        error: `Generation blocked: ${blockingIssues.length} unresolved critical safety/compliance gap(s) must be resolved before proceeding.`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      stage: 'APPROVED_FOR_GENERATION',
+      approvedBy,
+      approvedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Server error' });
+  }
+});
+
 // ==========================================
 // Google Veo Video Generation API Endpoints
 // ==========================================
+
 
 // 1. Start on-demand video generation
 app.post('/api/generate-video', async (req, res) => {

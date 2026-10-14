@@ -38,6 +38,8 @@ import { validateSourceFidelity } from './utils/sourceValidator';
 import { generateDomainNeutralLesson } from './utils/domainNeutralGenerator';
 import { getApiHeaders } from './utils/apiHelper';
 import { ShowMeVideoModal } from './components/ShowMeVideoModal';
+import { SopGenerationModal } from './components/SopGenerationModal';
+import { AnalyzingModal } from './components/AnalyzingModal';
 
 export default function App() {
   const [isDesignCheck, setIsDesignCheck] = useState<boolean>(
@@ -72,6 +74,7 @@ export default function App() {
   // Navigation & Flow State:
   const [isScanOpen, setIsScanOpen] = useState<boolean>(false);
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
+  const [extractedDocForModal, setExtractedDocForModal] = useState<ExtractedDocument | null>(null);
 
   // Validation Error State:
   const [validationError, setValidationError] = useState<{ filename: string; reason: string } | null>(null);
@@ -103,6 +106,7 @@ export default function App() {
   const [isVideoDemoOpen, setIsVideoDemoOpen] = useState<boolean>(false);
   const [activeSimulator, setActiveSimulator] = useState<Lesson | null>(null);
   const [simulatorPhase, setSimulatorPhase] = useState<number>(1);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // Omnipresent Stage Controls:
   const [isTrainerModalOpen, setIsTrainerModalOpen] = useState<boolean>(false);
@@ -576,17 +580,47 @@ export default function App() {
         onClose={() => setIsScanOpen(false)}
         onScanSuccess={(extractedDoc) => {
           setIsScanOpen(false);
-          handleProcessExtractedDocument(extractedDoc);
+          setIsAnalyzing(true);
+          setTimeout(() => {
+            setIsAnalyzing(false);
+            setExtractedDocForModal(extractedDoc);
+          }, 2000);
         }}
       />
 
-      {/* 2. STARTING OPTION: Upload the SOP Modal */}
+      {/* 2. UPLOAD FILE / PASTE SOP TEXT MODAL */}
       <UploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={(extractedDoc) => {
           setIsUploadOpen(false);
-          handleProcessExtractedDocument(extractedDoc);
+          setIsAnalyzing(true);
+          setTimeout(() => {
+            setIsAnalyzing(false);
+            setExtractedDocForModal(extractedDoc);
+          }, 2000);
+        }}
+      />
+
+      {/* Analyzing Modal */}
+      <AnalyzingModal 
+        isOpen={isAnalyzing} 
+        onCancel={() => setIsAnalyzing(false)} 
+      />
+
+      {/* 3. SOP GENERATION MODE SELECTION (AUTO-CREATE vs INSTRUCT MODE) */}
+      <SopGenerationModal
+        isOpen={extractedDocForModal !== null}
+        onClose={() => setExtractedDocForModal(null)}
+        extractedDoc={extractedDocForModal}
+        onDeckCreated={(lesson) => {
+          setExtractedDocForModal(null);
+          setSelectedLesson(lesson);
+          setLessons((prev) => [lesson, ...prev.filter((l) => l.id !== lesson.id)]);
+        }}
+        onUploadNew={() => {
+          setExtractedDocForModal(null);
+          setIsUploadOpen(true);
         }}
       />
 

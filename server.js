@@ -1,6 +1,6 @@
 // server.ts
 import express from "express";
-import { GoogleGenAI, GenerateVideosOperation } from "@google/genai";
+import { GoogleGenAI as GoogleGenAI2, GenerateVideosOperation } from "@google/genai";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -1178,6 +1178,268 @@ function validateVideoPlan(plan, blueprint) {
   };
 }
 
+// src/services/imageGenerationService.ts
+import { GoogleGenAI } from "@google/genai";
+var runtimeProviderOverride = null;
+function getFalApiKey(overrideKey) {
+  const raw = (overrideKey || process.env.FAL_KEY || process.env.FAL_API_KEY || process.env.VITE_FAL_KEY || "").trim();
+  const cleaned = raw.replace(/^["']|["']$/g, "").trim();
+  return cleaned || void 0;
+}
+function getGeminiApiKey(overrideKey) {
+  const raw = (overrideKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || "").trim();
+  const cleaned = raw.replace(/^["']|["']$/g, "").trim();
+  return cleaned || void 0;
+}
+function getActiveImageProvider() {
+  if (runtimeProviderOverride) {
+    return runtimeProviderOverride;
+  }
+  const envConfig = (process.env.IMAGE_GENERATION_PROVIDER || process.env.IMAGE_PROVIDER || "").toLowerCase().trim();
+  if (envConfig.startsWith("imagen") || envConfig === "google") {
+    return "imagen";
+  }
+  if (envConfig.startsWith("flux") || envConfig === "fal") {
+    return "flux";
+  }
+  const hasFal = Boolean(getFalApiKey());
+  const hasGemini = Boolean(getGeminiApiKey());
+  if (hasFal) return "flux";
+  if (hasGemini) return "imagen";
+  return "flux";
+}
+function setRuntimeImageProvider(provider) {
+  runtimeProviderOverride = provider;
+}
+function getImageGenerationConfig() {
+  const currentProvider = getActiveImageProvider();
+  const hasFal = Boolean(getFalApiKey());
+  const hasGemini = Boolean(getGeminiApiKey());
+  const fluxModel = process.env.FLUX_MODEL || "fal-ai/flux/schnell";
+  const imagenModel = process.env.IMAGEN_MODEL || "imagen-3.0-generate-002";
+  const available = [];
+  if (hasFal) available.push("flux");
+  if (hasGemini) available.push("imagen");
+  if (available.length === 0) {
+    available.push("flux", "imagen");
+  }
+  return {
+    provider: currentProvider,
+    activeModel: currentProvider === "flux" ? fluxModel : imagenModel,
+    hasFalKey: hasFal,
+    hasGeminiKey: hasGemini,
+    availableProviders: available,
+    models: {
+      flux: fluxModel,
+      imagen: imagenModel
+    }
+  };
+}
+function buildEnhancedSOPPrompt(prompt, role, stepTitle) {
+  const roleName = role ? role.trim() : "professional workplace frontline specialist";
+  const actionDescription = prompt.trim();
+  const context = stepTitle ? `Action: "${stepTitle}". ` : "";
+  return `Documentary photo of a ${roleName} in authentic workplace environment. ${context}${actionDescription}. Photorealistic, clear cinematic lighting, natural workplace depth, high resolution 4k, crisp authentic details. Zero burned-in text, zero watermarks, zero logos, natural human posture.`;
+}
+async function generateWithFluxSchnell(enhancedPrompt, aspectRatio, falKey) {
+  const resolvedKey = getFalApiKey(falKey);
+  if (!resolvedKey) {
+    throw new Error(
+      "FAL_KEY is not configured on the server. Please set FAL_KEY in your environment to use FLUX.1 Schnell."
+    );
+  }
+  const model = process.env.FLUX_MODEL || "fal-ai/flux/schnell";
+  const endpoint = `https://fal.run/${model}`;
+  let imageSize = "landscape_16_9";
+  if (aspectRatio === "1:1") imageSize = "square_hd";
+  else if (aspectRatio === "9:16") imageSize = "portrait_16_9";
+  else if (aspectRatio === "4:3") imageSize = "landscape_4_3";
+  else if (aspectRatio === "3:4") imageSize = "portrait_4_3";
+  const body = {
+    prompt: enhancedPrompt,
+    image_size: imageSize,
+    num_inference_steps: 4,
+    // Schnell optimal steps
+    num_images: 1,
+    enable_safety_checker: true,
+    sync_mode: true
+  };
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${resolvedKey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "aistudio-flux-service"
+    },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    let errorDetail = "";
+    try {
+      const errText = await response.text();
+      try {
+        const errJson = JSON.parse(errText);
+        errorDetail = errJson.detail || errJson.message || errText;
+      } catch {
+        errorDetail = errText;
+      }
+    } catch {
+      errorDetail = `HTTP ${response.status}`;
+    }
+    throw new Error(`Fal.ai FLUX API returned status ${response.status}: ${errorDetail}`);
+  }
+  const data = await response.json();
+  const images = data.images || [];
+  if (!images.length || !images[0]?.url) {
+    throw new Error("Fal.ai returned success response but no image URL was found.");
+  }
+  return {
+    imageUrl: images[0].url,
+    seed: data.seed
+  };
+}
+async function generateWithImagen(enhancedPrompt, aspectRatio, geminiKey) {
+  const resolvedKey = getGeminiApiKey(geminiKey);
+  if (!resolvedKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not configured on the server. Please set GEMINI_API_KEY to use Gemini/Imagen."
+    );
+  }
+  const ai = new GoogleGenAI({
+    apiKey: resolvedKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-imagen-service"
+      }
+    }
+  });
+  const imagenModel = process.env.IMAGEN_MODEL || "imagen-3.0-generate-002";
+  try {
+    const response2 = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: `High-resolution documentary workplace photograph, 16:9 widescreen, photorealistic, clear natural lighting: ${enhancedPrompt}`
+    });
+    const parts = response2.candidates?.[0]?.content?.parts || [];
+    const imagePart = parts.find((p) => p.inlineData && p.inlineData.data);
+    if (imagePart?.inlineData?.data) {
+      const mime = imagePart.inlineData.mimeType || "image/png";
+      return {
+        imageUrl: `data:${mime};base64,${imagePart.inlineData.data}`,
+        model: "gemini-2.5-flash-image"
+      };
+    }
+  } catch (flashErr) {
+    console.warn("[ImageService] gemini-2.5-flash-image attempt failed, trying generateImages:", flashErr?.message);
+  }
+  const validRatios = [
+    "1:1",
+    "3:4",
+    "4:3",
+    "9:16",
+    "16:9"
+  ];
+  const mappedRatio = validRatios.includes(aspectRatio) ? aspectRatio : "16:9";
+  const response = await ai.models.generateImages({
+    model: imagenModel,
+    prompt: enhancedPrompt,
+    config: {
+      numberOfImages: 1,
+      outputMimeType: "image/jpeg",
+      aspectRatio: mappedRatio
+    }
+  });
+  const generated = response?.generatedImages?.[0]?.image?.imageBytes;
+  if (!generated) {
+    throw new Error("Imagen returned success response but no image bytes were found.");
+  }
+  return {
+    imageUrl: `data:image/jpeg;base64,${generated}`,
+    model: imagenModel
+  };
+}
+async function generateImage(options) {
+  const startTime = Date.now();
+  const provider = options.provider || getActiveImageProvider();
+  const aspectRatio = options.aspectRatio || "16:9";
+  const enhancedPrompt = buildEnhancedSOPPrompt(
+    options.prompt,
+    options.role,
+    options.stepTitle
+  );
+  const fluxModel = process.env.FLUX_MODEL || "fal-ai/flux/schnell";
+  const imagenModel = process.env.IMAGEN_MODEL || "imagen-3.0-generate-002";
+  const targetModel = provider === "flux" ? fluxModel : imagenModel;
+  try {
+    if (provider === "flux") {
+      const result = await generateWithFluxSchnell(
+        enhancedPrompt,
+        aspectRatio,
+        options.falApiKey
+      );
+      return {
+        success: true,
+        provider: "flux",
+        model: targetModel,
+        imageUrl: result.imageUrl,
+        seed: result.seed,
+        originalPrompt: options.prompt,
+        enhancedPrompt,
+        durationMs: Date.now() - startTime
+      };
+    } else {
+      const result = await generateWithImagen(
+        enhancedPrompt,
+        aspectRatio,
+        options.geminiApiKey
+      );
+      return {
+        success: true,
+        provider: "imagen",
+        model: result.model || targetModel,
+        imageUrl: result.imageUrl,
+        mimeType: "image/jpeg",
+        originalPrompt: options.prompt,
+        enhancedPrompt,
+        durationMs: Date.now() - startTime
+      };
+    }
+  } catch (primaryErr) {
+    const errorMsg = primaryErr?.message || String(primaryErr);
+    console.warn(`[ImageService] Primary provider ${provider} failed (${errorMsg}). Checking fallback options...`);
+    if (provider === "flux" && getGeminiApiKey(options.geminiApiKey)) {
+      console.warn(`[ImageService] FLUX failed. Seamlessly generating photorealistic visual with Google Gemini/Imagen...`);
+      try {
+        const fallbackResult = await generateWithImagen(
+          enhancedPrompt,
+          aspectRatio,
+          options.geminiApiKey
+        );
+        return {
+          success: true,
+          provider: "imagen",
+          model: fallbackResult.model || imagenModel,
+          imageUrl: fallbackResult.imageUrl,
+          mimeType: "image/jpeg",
+          originalPrompt: options.prompt,
+          enhancedPrompt,
+          durationMs: Date.now() - startTime
+        };
+      } catch (fallbackErr) {
+        console.error("[ImageService] Fallback to Gemini/Imagen also failed:", fallbackErr?.message);
+      }
+    }
+    return {
+      success: false,
+      provider,
+      model: targetModel,
+      error: errorMsg,
+      originalPrompt: options.prompt,
+      enhancedPrompt,
+      durationMs: Date.now() - startTime
+    };
+  }
+}
+
 // server.ts
 dotenv.config();
 var __filename = fileURLToPath(import.meta.url);
@@ -1246,7 +1508,7 @@ function getApiKey(req) {
 function getGeminiClient(req) {
   const apiKey = getApiKey(req);
   if (!apiKey) return null;
-  return new GoogleGenAI({
+  return new GoogleGenAI2({
     apiKey,
     httpOptions: {
       headers: {
@@ -1384,7 +1646,7 @@ Do NOT summarize. Return JSON:
 });
 app.post("/api/gemini/generate-blueprint", async (req, res) => {
   try {
-    const { rawText, fileBase64, mimeType, filename, fileHash, pageCount, wordCount } = req.body;
+    const { rawText, fileBase64, mimeType, filename, fileHash, pageCount, wordCount, instructMode, selectedOptionId, customInstruction } = req.body;
     const aiClient = getGeminiClient(req);
     if (!aiClient) {
       console.warn("[Server /api/gemini/generate-blueprint] No Gemini API key found in environment.");
@@ -1395,7 +1657,7 @@ app.post("/api/gemini/generate-blueprint", async (req, res) => {
       });
     }
     const parts = [];
-    const docText = rawText ? rawText.slice(0, 48e3) : "";
+    const docText = rawText || "";
     if (docText && docText.length > 50) {
     } else if (fileBase64 && typeof fileBase64 === "string") {
       parts.push({
@@ -1460,7 +1722,14 @@ CRITICAL ARCHITECTURAL RULES:
    - BAN COMPLETION VERBS: Do not use verbs indicating an end state (e.g., 'closes the laptop', 'presses the button', 'sits down'). Instead mandate continuous progressive action states (e.g., 'the laptop remains open as data flows', 'finger holding down the button safely', 'seated stationary while analyzing').
    - CAMERA WORK: End every prompt with fluid continuous camera motion (e.g., "slow cinematic lateral tracking shot gently drifting leftward", "subtle continuous forward camera drift maintaining steady focal depth").
 7. MANDATORY OUTPUT FORMAT: Respond strictly with valid, un-truncated JSON conforming to the requested schema.`;
+    const instructGuidance = instructMode ? `
+INSTRUCT MODE GUIDANCE:
+Selected Structure Option ID: ${selectedOptionId || "default"}
+User Custom Instruction: "${customInstruction || "Emphasize document-grounded operational structure"}"
+Prioritize and tailor task decomposition and focus areas according to this guidance while adhering strictly to source facts (no invention).
+` : "";
     const textPrompt = `Uploaded SOP Document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
+${instructGuidance}
 ${docText ? `Document Text:
 """
 ${docText}
@@ -1571,7 +1840,7 @@ Extract the complete OPERATIONAL BLUEPRINT as JSON with this exact schema:
   "confidence": 0.98
 }
 
-Generate between 5 to 9 comprehensive operational_steps covering the entire lifecycle of the SOP.`;
+The number of operational_steps must emerge naturally from the SOP's actual operational complexity. Do NOT force a fixed step count. A simple SOP should produce a concise task structure; a complex SOP must retain all distinct operational tasks without arbitrary truncation or merging.`;
     parts.push({ text: textPrompt });
     let response;
     try {
@@ -1691,6 +1960,299 @@ app.post("/api/coach", async (req, res) => {
       error: "LLM_PROVIDER_ERROR",
       message: error.message || "Failed to generate response"
     });
+  }
+});
+app.post("/api/sop/instruct-options", async (req, res) => {
+  try {
+    const { filename = "SOP Document", rawText = "", wordCount = 100, pageCount = 1 } = req.body;
+    const aiClient = getGeminiClient(req);
+    const defaultOptions = [
+      {
+        id: "opt-standard",
+        title: "Standard Operational Flow",
+        description: "Balanced, step-by-step procedural training covering prerequisites, core execution, and verification.",
+        focusAreas: ["End-to-End Procedural Flow", "Task Verification", "Standard Operations"],
+        recommendedSteps: 5
+      },
+      {
+        id: "opt-controls-exceptions",
+        title: "Critical Controls & Edge Cases",
+        description: "Emphasizes high-stakes safety rules, decision criteria, exception handling, and escalation protocols.",
+        focusAreas: ["Critical Safety Controls", "Exception Recovery", "Escalations"],
+        recommendedSteps: 6
+      },
+      {
+        id: "opt-fast-track",
+        title: "Fast-Track Field Drill",
+        description: "Concise, high-velocity frontline drill focusing strictly on core physical and system actions.",
+        focusAreas: ["Core Action Verbs", "Fast Field Execution", "Target Barcodes/Codes"],
+        recommendedSteps: 4
+      }
+    ];
+    if (!aiClient) {
+      return res.json({ success: true, options: defaultOptions });
+    }
+    const prompt = `Analyze this SOP document: "${filename}" (${pageCount} pages, ${wordCount} words)
+Document Text:
+"""
+${(rawText || "").slice(0, 16e3)}
+"""
+
+Recommend 3 distinct training structure options tailored specifically to this SOP document.
+Return JSON:
+{
+  "options": [
+    {
+      "id": "opt-1",
+      "title": "Clear 2-4 word option title (e.g. Standard Return Pickup, Critical Safety Drill)",
+      "description": "1 sentence describing the training emphasis based on the document",
+      "focusAreas": ["3 short bullet tags highlighting what this structure focuses on"],
+      "recommendedSteps": estimated integer step count
+    }
+  ]
+}`;
+    const response = await aiClient.models.generateContent({
+      model: MODEL_FAST,
+      contents: prompt,
+      config: {
+        systemInstruction: "You are an expert instructional designer. Propose 3 tailored training structures grounded in the provided SOP. Respond strictly with valid JSON.",
+        responseMimeType: "application/json",
+        temperature: 0.3
+      }
+    });
+    const parsed = cleanAndRepairJson(response.text || "{}");
+    if (parsed && Array.isArray(parsed.options) && parsed.options.length > 0) {
+      return res.json({ success: true, options: parsed.options });
+    }
+    return res.json({ success: true, options: defaultOptions });
+  } catch (err) {
+    console.warn("[Server /api/sop/instruct-options error]:", err?.message);
+    return res.json({
+      success: true,
+      options: [
+        {
+          id: "opt-standard",
+          title: "Standard Operational Flow",
+          description: "Balanced, step-by-step procedural training covering prerequisites, core execution, and verification.",
+          focusAreas: ["End-to-End Procedural Flow", "Task Verification", "Standard Operations"],
+          recommendedSteps: 5
+        },
+        {
+          id: "opt-controls-exceptions",
+          title: "Critical Controls & Edge Cases",
+          description: "Emphasizes high-stakes safety rules, decision criteria, exception handling, and escalation protocols.",
+          focusAreas: ["Critical Safety Controls", "Exception Recovery", "Escalations"],
+          recommendedSteps: 6
+        },
+        {
+          id: "opt-fast-track",
+          title: "Fast-Track Field Drill",
+          description: "Concise, high-velocity frontline drill focusing strictly on core physical and system actions.",
+          focusAreas: ["Core Action Verbs", "Fast Field Execution", "Target Barcodes/Codes"],
+          recommendedSteps: 4
+        }
+      ]
+    });
+  }
+});
+app.post("/api/sop/extract-report", async (req, res) => {
+  try {
+    const { filename, rawText, wordCount, pageCount, fileHash, fileBase64, mimeType } = req.body;
+    const aiClient = getGeminiClient(req);
+    const systemInstruction = `You are analysing an uploaded operational SOP to prepare a source-grounded learning experience.
+Extract what the document actually states. Identify the purpose, ordered operational tasks, prerequisites, decisions, exceptions, critical controls, completion conditions and evidence requirements.
+Attach source references to each material requirement.
+Separate explicit requirements from interpretations, ambiguities, contradictions and missing information.
+Do not invent procedures, operational details, policy requirements or escalation authority. Do not assume a fixed number of tasks. Do not generate the learning deck at this stage.
+Return structured, schema-valid data and a concise human-readable extraction report. Report limitations honestly.`;
+    const textPrompt = `Analyse SOP document: "${filename}" (${pageCount || 1} pages, ${wordCount || 100} words)
+Text:
+"""
+${(rawText || "").slice(0, 32e3)}
+"""
+
+Return JSON conforming strictly to:
+{
+  "extractionReport": {
+    "documentIdentity": {
+      "filename": "${filename}",
+      "docTitle": "${(filename || "Operational Procedure").replace(/\.(pdf|txt|docx)$/i, "")}",
+      "uploadedAt": "${(/* @__PURE__ */ new Date()).toISOString()}",
+      "wordCount": ${wordCount || 100},
+      "pageCount": ${pageCount || 1}
+    },
+    "documentPurpose": "Clear, extracted document purpose from text",
+    "intendedOutcome": "Extracted primary operational outcome",
+    "extractedRequirements": [
+      {
+        "id": "req-1",
+        "type": "task" | "prerequisite" | "decision" | "exception" | "escalation" | "control" | "completion",
+        "title": "Concise requirement title",
+        "instruction": "Full instruction text",
+        "category": "DO" | "CHECK" | "DECIDE" | "RECOVER" | "ESCALATE",
+        "provenance": "VERBATIM_SOURCE",
+        "sourceRef": "Section or Page number",
+        "sourceText": "Exact quote from SOP",
+        "isCriticalControl": true/false
+      }
+    ],
+    "stepsCount": number of operational tasks,
+    "prerequisitesCount": number of prerequisites,
+    "decisionsCount": number of decision points,
+    "exceptionsCount": number of exception rules,
+    "criticalControlsCount": number of critical controls,
+    "missingInfoCount": number of missing details,
+    "contradictionsAndAmbiguities": [
+      {
+        "id": "amb-1",
+        "topic": "Topic name",
+        "description": "What is ambiguous or missing in the source",
+        "severity": "critical" | "high" | "medium" | "low",
+        "sourceRef": "Section name",
+        "isBlocking": true/false
+      }
+    ],
+    "coverageStatus": {
+      "isComplete": true,
+      "wordCount": ${wordCount || 100},
+      "pageCount": ${pageCount || 1}
+    }
+  },
+  "unresolvedIssues": [
+    {
+      "id": "issue-1",
+      "category": "safety" | "conflict" | "decision_criteria" | "completion" | "training_preference",
+      "description": "Description of unresolved issue",
+      "severity": "high" | "medium" | "low",
+      "isBlocking": false,
+      "resolved": false
+    }
+  ],
+  "clarificationQuestions": [
+    {
+      "questionId": "q-1",
+      "questionText": "Targeted question to clarify unstated or ambiguous detail",
+      "reason": "Why this question matters for training structure",
+      "category": "decision_criteria",
+      "sourceRef": "Section ref",
+      "isMandatory": false,
+      "consequenceOfLeavingUnanswered": "What happens if skipped",
+      "status": "pending",
+      "options": [
+        { "id": "opt-1", "label": "Option label", "isCompliantWithSource": true }
+      ]
+    }
+  ]
+}`;
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true, reason: "No API key on server" });
+    }
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: textPrompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        maxOutputTokens: 8192,
+        temperature: 0.2
+      }
+    });
+    const parsed = cleanAndRepairJson(response.text || "{}");
+    return res.json({ success: true, ...parsed });
+  } catch (err) {
+    console.warn("[Server /api/sop/extract-report error]:", err?.message);
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+app.post("/api/sop/clarification-chat", async (req, res) => {
+  try {
+    const { session, latestAnswer } = req.body;
+    const aiClient = getGeminiClient(req);
+    const systemInstruction = `You are clarifying the interpretation of an already-extracted SOP.
+Use the current extraction report, unresolved issues, previous answers and approved supplementary instructions.
+Ask only questions that materially affect correct task execution, safety, source interpretation, learning structure or assessment validity.
+Prioritize critical issues. Ask the minimum number of useful questions. Do not ask for information already established by the source or a previous answer.
+Never invent a missing process rule. If an answer introduces a new rule, record it as supplementary information. If it conflicts with a source requirement or exceeds the user's apparent authority, flag it for resolution instead of silently accepting it.
+Return the next question, its reason, supporting references, answer options where useful, mandatory status and the updated unresolved-issues list.`;
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true });
+    }
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: `Session State:
+${JSON.stringify(session).slice(0, 16e3)}
+Latest Answer:
+${JSON.stringify(latestAnswer)}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0.2
+      }
+    });
+    const parsed = cleanAndRepairJson(response.text || "{}");
+    return res.json({ success: true, ...parsed });
+  } catch (err) {
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+app.post("/api/sop/generate-blueprint", async (req, res) => {
+  try {
+    const { session, filename, rawText, extractionReport, supplementaryInstructions } = req.body;
+    const aiClient = getGeminiClient(req);
+    const systemInstruction = `Create a learning blueprint from the validated SOP interpretation, the existing Canonical Task Model and approved clarification records.
+Preserve operational order, prerequisites, decision criteria, exceptions, critical controls and completion conditions.
+Map every proposed task and learning objective to its CTM requirement identifiers.
+Identify any requirement that cannot yet be taught or assessed reliably.
+Do not add unsupported procedural details. Do not omit critical controls for the sake of brevity. Do not generate the final four learning experiences until the blueprint is explicitly approved and all mandatory validations pass.`;
+    if (!aiClient) {
+      return res.json({ success: false, fallback: true });
+    }
+    const response = await aiClient.models.generateContent({
+      model: MODEL_PRO,
+      contents: `SOP: ${filename}
+Report:
+${JSON.stringify(extractionReport).slice(0, 8e3)}
+Supplementary:
+${JSON.stringify(supplementaryInstructions)}`,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0.2
+      }
+    });
+    const parsed = cleanAndRepairJson(response.text || "{}");
+    return res.json({ success: true, learningBlueprint: parsed.learningBlueprint || parsed });
+  } catch (err) {
+    return res.json({ success: false, fallback: true, error: err?.message });
+  }
+});
+app.post("/api/sop/approve-and-generate", async (req, res) => {
+  try {
+    const { session, approvedBy = "Operations Reviewer" } = req.body;
+    if (!session) {
+      return res.status(400).json({ success: false, error: "Missing session data" });
+    }
+    if (session.currentStage !== "BLUEPRINT_REVIEW" && session.currentStage !== "APPROVED_FOR_GENERATION") {
+      return res.status(422).json({
+        success: false,
+        error: `Stage transition rejected: Cannot generate training deck from stage '${session.currentStage}'. Explicit blueprint review is required.`
+      });
+    }
+    const blockingIssues = (session.unresolvedIssues || []).filter((i) => i.isBlocking && !i.resolved);
+    if (blockingIssues.length > 0) {
+      return res.status(422).json({
+        success: false,
+        error: `Generation blocked: ${blockingIssues.length} unresolved critical safety/compliance gap(s) must be resolved before proceeding.`
+      });
+    }
+    return res.json({
+      success: true,
+      stage: "APPROVED_FOR_GENERATION",
+      approvedBy,
+      approvedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || "Server error" });
   }
 });
 app.post("/api/generate-video", async (req, res) => {
@@ -1884,6 +2446,73 @@ app.delete("/api/videos/:lessonId", (req, res) => {
     return res.json({ success: true, message: "Server video storage cleared." });
   } catch (error) {
     return res.status(500).json({ success: false, error: "Failed to delete videos." });
+  }
+});
+app.get("/api/image-generation/config", (_req, res) => {
+  try {
+    const config = getImageGenerationConfig();
+    return res.json({ success: true, config });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+});
+app.post("/api/image-generation/toggle-provider", (req, res) => {
+  try {
+    const { provider } = req.body;
+    if (provider === "flux" || provider === "imagen") {
+      setRuntimeImageProvider(provider);
+    } else if (provider === null || provider === "auto" || provider === "default") {
+      setRuntimeImageProvider(null);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid provider. Must be "flux", "imagen", or "auto".'
+      });
+    }
+    const updatedConfig = getImageGenerationConfig();
+    return res.json({ success: true, config: updatedConfig });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err?.message || String(err) });
+  }
+});
+app.post(["/api/image-generation/generate", "/api/generate-image"], async (req, res) => {
+  try {
+    const {
+      prompt,
+      role,
+      stepTitle,
+      aspectRatio = "16:9",
+      provider,
+      falApiKey,
+      geminiApiKey
+    } = req.body;
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "A non-empty prompt string is required."
+      });
+    }
+    const headerGeminiKey = ((typeof req.headers["x-gemini-api-key"] === "string" ? req.headers["x-gemini-api-key"] : "") || (typeof req.headers["authorization"] === "string" ? req.headers["authorization"].replace(/^Bearer\s+/i, "") : "")).trim();
+    const headerFalKey = (typeof req.headers["x-fal-key"] === "string" ? req.headers["x-fal-key"] : "").trim();
+    const result = await generateImage({
+      prompt,
+      role,
+      stepTitle,
+      aspectRatio,
+      provider,
+      geminiApiKey: geminiApiKey || headerGeminiKey || void 0,
+      falApiKey: falApiKey || headerFalKey || void 0
+    });
+    if (!result.success) {
+      return res.status(result.error?.includes("not configured") ? 400 : 502).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error("[Image Generation Route Error]", err);
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "Internal server error while generating image."
+    });
   }
 });
 app.all("/api/*", (req, res) => {

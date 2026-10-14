@@ -212,3 +212,154 @@ export function validateSourceFidelity(
     domainName,
   };
 }
+
+export interface SourceReconciliationReport {
+  isReconciled: boolean;
+  totalSourceRequirements: number;
+  mappedRequirementsCount: number;
+  unmappedRequirements: { lineIndex: number; text: string; reason: string }[];
+  duplicatedTasksCount: number;
+  unsupportedAdditionsCount: number;
+  unsupportedClaims: { taskId: string; instruction: string; reason: string }[];
+}
+
+/**
+ * Reconciles material source requirements from raw text against the Canonical Task Model (CTM).
+ * Detects unmapped source requirements, duplicated tasks, and unsupported additions.
+ */
+export function reconcileSourceRequirements(
+  rawText: string,
+  ctm: {
+    steps: Array<{ id: string; instruction: string; source?: { sourceText?: string } }>;
+    controls: Array<{ id: string; rule: string; source?: { sourceText?: string } }>;
+    decisions: Array<{ id: string; situation: string; compliantAction?: string }>;
+    exceptionsAndEscalations: Array<{ id: string; trigger: string; resolutionOrAction?: string }>;
+    prerequisites: Array<{ id: string; text: string }>;
+  }
+): SourceReconciliationReport {
+  if (!rawText) {
+    return {
+      isReconciled: true,
+      totalSourceRequirements: 0,
+      mappedRequirementsCount: 0,
+      unmappedRequirements: [],
+      duplicatedTasksCount: 0,
+      unsupportedAdditionsCount: 0,
+      unsupportedClaims: [],
+    };
+  }
+
+  const rawLower = rawText.toLowerCase();
+
+  const lines = rawText
+    .split(/\n+/)
+    .map((l) => l.replace(/^(\d+[.)]|[-*•])\s+/, '').trim())
+    .filter((l) => l.length >= 15);
+
+  const nonOpRegex = /^(standard operating procedure|sop\b|doc ref|document ref|version|effective date|department|approved by|page \d+|revision|title:)/i;
+  const materialLines = lines.filter((l) => !nonOpRegex.test(l));
+
+  const ctmTextBlob = [
+    ...(ctm.steps || []).map((s) => `${s.instruction} ${s.source?.sourceText || ''}`),
+    ...(ctm.controls || []).map((c) => `${c.rule} ${c.source?.sourceText || ''}`),
+    ...(ctm.decisions || []).map((d) => `${d.situation} ${d.compliantAction || ''}`),
+    ...(ctm.exceptionsAndEscalations || []).map((e) => `${e.trigger} ${e.resolutionOrAction || ''}`),
+    ...(ctm.prerequisites || []).map((p) => p.text),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  // 1. Detect unmapped source requirements
+  const unmappedRequirements: { lineIndex: number; text: string; reason: string }[] = [];
+
+  materialLines.forEach((line, idx) => {
+    const keyWords = line
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 5);
+
+    if (keyWords.length >= 2) {
+      const matchCount = keyWords.filter((w) => ctmTextBlob.includes(w)).length;
+      const matchRatio = matchCount / keyWords.length;
+      if (matchRatio < 0.3) {
+        unmappedRequirements.push({
+          lineIndex: idx + 1,
+          text: line,
+          reason: `Material source requirement on line ${idx + 1} ("${line.slice(0, 60)}...") is not represented in CTM.`,
+        });
+      }
+    }
+  });
+
+  // 2. Detect unsupported additions in CTM
+  const unsupportedClaims: { taskId: string; instruction: string; reason: string }[] = [];
+  (ctm.steps || []).forEach((s) => {
+    const words = s.instruction
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 5 && !['verify', 'ensure', 'always', 'system', 'process', 'action', 'check'].includes(w));
+
+    if (words.length >= 2) {
+      const matchCount = words.filter((w) => rawLower.includes(w)).length;
+      if (matchCount === 0) {
+        unsupportedClaims.push({
+          taskId: s.id,
+          instruction: s.instruction,
+          reason: `CTM Task ${s.id} ("${s.instruction.slice(0, 50)}") contains operational terms absent from source text.`,
+        });
+      }
+    }
+  });
+
+  // 3. Detect duplicate tasks
+  const seenTaskTexts = new Set<string>();
+  let duplicatedTasksCount = 0;
+  (ctm.steps || []).forEach((s) => {
+    const cleanStr = s.instruction.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (seenTaskTexts.has(cleanStr)) {
+      duplicatedTasksCount++;
+    } else {
+      seenTaskTexts.add(cleanStr);
+    }
+  });
+
+  const totalSourceRequirements = materialLines.length;
+  const mappedRequirementsCount = totalSourceRequirements - unmappedRequirements.length;
+  const isReconciled = unmappedRequirements.length === 0 && unsupportedClaims.length === 0;
+
+  return {
+    isReconciled,
+    totalSourceRequirements,
+    mappedRequirementsCount,
+    unmappedRequirements,
+    duplicatedTasksCount,
+    unsupportedAdditionsCount: unsupportedClaims.length,
+    unsupportedClaims,
+  };
+}
+
+export interface SourceCompletenessReport {
+  isComplete: boolean;
+  totalSourceRequirements: number;
+  mappedRequirementsCount: number;
+  unmappedRequirements: any[];
+  duplicatedTasksCount: number;
+  unsupportedClaimsCount: number;
+}
+
+export function validateSourceCompleteness(
+  rawText: string,
+  ctm: any
+): SourceCompletenessReport {
+  const recon = reconcileSourceRequirements(rawText, ctm);
+  return {
+    isComplete: recon.isReconciled,
+    totalSourceRequirements: recon.totalSourceRequirements,
+    mappedRequirementsCount: recon.mappedRequirementsCount,
+    unmappedRequirements: recon.unmappedRequirements,
+    duplicatedTasksCount: recon.duplicatedTasksCount,
+    unsupportedClaimsCount: recon.unsupportedAdditionsCount,
+  };
+}

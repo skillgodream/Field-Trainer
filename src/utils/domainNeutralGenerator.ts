@@ -243,11 +243,29 @@ export function buildSopKnowledgeModel(extracted: ExtractedDocument): SopKnowled
       if (line.match(/^(section|chapter|part)\s+\d+/i) || (line.length < 50 && line.endsWith(':') && !line.includes(' '))) {
         currentSection = line.replace(/[:\#]/g, '').trim();
       } else if (isOperationalContent(line, extracted.filename)) {
-        // Exclude lines ending with question mark (audit questions) or starting with NEVER from stepsList
+        // Exclude lines ending with question mark (audit questions), starting with NEVER, OR starting with EXCEPTION / ESCALATION from stepsList
         const trimmed = line.trim();
-        if (trimmed.endsWith('?') || /^(?:never|do not)\b/i.test(trimmed)) {
-          if (/^(?:never|do not)\b/i.test(trimmed)) {
-            mistakesFound.push(trimmed.replace(/^[\d\.\-\*\•]\s*/, '').trim());
+        const cleanTrimmed = trimmed.replace(/^[\d\.\-\*\•\:]\s*/, '').trim();
+        if (trimmed.endsWith('?') || /^(?:never|do not)\b/i.test(cleanTrimmed) || /^(?:exception|escalation)\b/i.test(cleanTrimmed)) {
+          if (/^(?:never|do not)\b/i.test(cleanTrimmed)) {
+            mistakesFound.push(cleanTrimmed);
+          }
+          if (/^exception/i.test(cleanTrimmed)) {
+            const clean = cleanTrimmed.replace(/^exception[:\s]*/i, '').trim();
+            exceptions.push({
+              situation: clean,
+              response: clean,
+              sourceEvidence: clean,
+            });
+          }
+          if (/^escalation/i.test(cleanTrimmed)) {
+            const clean = cleanTrimmed.replace(/^escalation[:\s]*/i, '').trim();
+            escalations.push({
+              trigger: clean,
+              action: clean,
+              escalationTarget: 'Authorised Lead',
+              sourceEvidence: clean,
+            });
           }
           return;
         }
@@ -583,86 +601,40 @@ function createScenarioQuestionFromStep(
   let instruction = item?.instruction || (item as any)?.step || (item as any)?.action || (item as any)?.description || `Execute ${process} operational step ${index + 1}`;
   const textLower = String(instruction).toLowerCase();
 
-  let question = `When performing ${process}, how do you execute: "${instruction}"?`;
-  let choiceCorrect = instruction;
-  let choiceDistractor1 = `Skip or bypass step to save operational time`;
-  let choiceDistractor2 = `Proceed without completing required verification`;
+  // Ensure choiceCorrect uses the verbatim source instruction or action
+  const cleanInstruction = item.source?.source_text || instruction;
 
-  if (textLower.includes('authorised instruction') || textLower.includes('readiness')) {
-    question = `Turnaround preparations are underway. When are you authorised to open the gate and begin passenger boarding?`;
-    choiceCorrect = `Only after receiving authorised instruction to begin boarding.`;
-    choiceDistractor1 = `As soon as passengers form a queue at the gate podium.`;
-    choiceDistractor2 = `At scheduled departure minus 30 minutes without waiting for instruction.`;
-  } else if (textLower.includes('announcement') || textLower.includes('prepare passengers')) {
-    question = `Passenger boarding is about to commence. How should you prepare passengers?`;
-    choiceCorrect = `Make clear boarding announcements and provide required instructions.`;
-    choiceDistractor1 = `Open the gate silently and let passengers determine boarding order.`;
-    choiceDistractor2 = `Announce an unverified departure gate to disperse passenger congestion.`;
-  } else if (textLower.includes('boarding document') || (textLower.includes('verify') && textLower.includes('document'))) {
-    question = `A passenger presents their documents at the gate. What is the mandatory verification procedure?`;
-    choiceCorrect = `Check boarding documents using the approved verification process.`;
-    choiceDistractor1 = `Wave the passenger through visually to keep the queue moving.`;
-    choiceDistractor2 = `Allow boarding and verify identity later during aircraft turnaround.`;
-  } else if (textLower.includes('queue') || textLower.includes('control flow') || textLower.includes('movement')) {
-    question = `The boarding queue is swelling into the terminal walkway. How must you control the flow?`;
-    choiceCorrect = `Manage the queue actively and maintain clear movement routes and emergency access.`;
-    choiceDistractor1 = `Allow passengers to crowd the doorway so boarding finishes faster.`;
-    choiceDistractor2 = `Direct overflow passengers through restricted airside access routes.`;
-  } else if (textLower.includes('assistance') || textLower.includes('monitor')) {
-    question = `A passenger requiring special assistance arrives at the gate. What action should you take?`;
-    choiceCorrect = `Identify their assistance needs and coordinate authorised support before proceeding.`;
-    choiceDistractor1 = `Instruct them to board unassisted with general passengers to avoid delays.`;
-    choiceDistractor2 = `Board all other passengers first and leave the passenger unattended.`;
-  } else if (textLower.includes('reconcil') && (textLower.includes('status') || textLower.includes('final check') || textLower.includes('according'))) {
-    question = `Prior to aircraft release, what must be confirmed regarding passenger boarding status?`;
-    choiceCorrect = `Passenger boarding status is reconciled according to the approved process.`;
-    choiceDistractor1 = `Release aircraft without passenger status reconciliation to save turnaround time.`;
-    choiceDistractor2 = `Assume manifest counts match if no gate alarms sounded during boarding.`;
-  } else if (textLower.includes('released') || textLower.includes('release')) {
-    question = `Turnaround support is complete. Under what authority is the flight released?`;
-    choiceCorrect = `Release or close the flight only through the authorised process.`;
-    choiceDistractor1 = `Release the flight as soon as the turnaround coordinator leaves the podium.`;
-    choiceDistractor2 = `Release the flight early without completing required operational communication.`;
-  } else if (textLower.includes('reconciliation') || textLower.includes('closure') || textLower.includes('close')) {
-    question = `All visible passengers have cleared the gate. What is the required process for boarding closure?`;
-    choiceCorrect = `Follow the approved process for final passenger reconciliation and boarding closure.`;
-    choiceDistractor1 = `Close the gate doors immediately without reconciling the manifest count.`;
-    choiceDistractor2 = `Authorise flight departure before confirming boarding status is reconciled.`;
-  } else if (textLower.includes('controlled and safe') || (textLower.includes('boarding area') && textLower.includes('safe'))) {
-    question = `Following boarding completion, what condition must be maintained at the gate and boarding area?`;
-    choiceCorrect = `Ensure gate and boarding area remain controlled and safe.`;
-    choiceDistractor1 = `Leave the jet bridge and gate podium unattended after boarding.`;
-    choiceDistractor2 = `Allow waiting passengers for subsequent flights into the active turnaround area.`;
-  } else if (textLower.includes('communication') && (textLower.includes('complete') || textLower.includes('operational'))) {
-    question = `Before final aircraft turnaround closure, what communication requirement must be verified?`;
-    choiceCorrect = `Confirm required operational communication is complete through designated channels.`;
-    choiceDistractor1 = `Omit formal communication if the flight crew appears busy.`;
-    choiceDistractor2 = `Rely on unverified verbal hearsay rather than designated operational channels.`;
-  } else if (textLower.includes('contingency') || (textLower.includes('system') && textLower.includes('unavailable'))) {
-    question = `During passenger boarding, the electronic boarding system becomes unavailable. What must you do?`;
-    choiceCorrect = `Use only the approved contingency process; do not improvise workarounds.`;
-    choiceDistractor1 = `Create an improvised manual checklist and continue boarding unverified.`;
-    choiceDistractor2 = `Bypass boarding document verification until systems come back online.`;
-  } else if (textLower.includes('unresolved') || textLower.includes('escalated')) {
-    question = `An unresolved passenger discrepancy or safety concern remains as departure nears. What is required?`;
-    choiceCorrect = `Escalate the issue through the authorised process before releasing the flight.`;
-    choiceDistractor1 = `Conceal the discrepancy so the flight departs on schedule.`;
-    choiceDistractor2 = `Leave the issue for the arrival station to investigate.`;
-  } else if (textLower.includes('disinfectant') || textLower.includes('spray') || textLower.includes('surfaces')) {
-    question = `When sanitizing high-touch guest surfaces, what is the required application?`;
-    choiceCorrect = `Apply EPA-certified disinfectant spray to all high-touch surfaces.`;
-    choiceDistractor1 = `Wipe surfaces dry immediately without applying disinfectant spray.`;
-    choiceDistractor2 = `Use plain tap water to clean high-touch areas to save chemicals.`;
-  } else if (textLower.includes('contact time') || textLower.includes('wet')) {
-    question = `After spraying disinfectant, how long must the surface remain wet?`;
-    choiceCorrect = `Allow a minimum of 5 minutes wet contact time before wiping with a clean microfiber cloth.`;
-    choiceDistractor1 = `Wipe immediately to complete room turnaround faster.`;
-    choiceDistractor2 = `Let dry without wiping or verifying dwell contact time.`;
-  } else if (textLower.includes('linen') || textLower.includes('towel')) {
-    question = `How should guest room bed linens and bath towels be replaced?`;
-    choiceCorrect = `Replace all bed linens and bath towels with freshly laundered linens from the linen cart.`;
-    choiceDistractor1 = `Reuse existing linens if they appear visually clean.`;
-    choiceDistractor2 = `Leave unmade beds for the next shift to handle.`;
+  let question = `When performing ${process}, how do you execute this step: "${instruction.slice(0, 90)}"?`;
+  let choiceCorrect = cleanInstruction;
+  let choiceDistractor1 = `Proceed without completing required verification`;
+  let choiceDistractor2 = `Improvise an unapproved workaround`;
+
+  // Domain-grounded contextual question & plausible distractors based on SOP facts
+  if (textLower.includes('order') || textLower.includes('customer') || textLower.includes('greet') || textLower.includes('details')) {
+    question = `When initiating ${process}, how do you verify customer and order details?`;
+    choiceCorrect = cleanInstruction;
+    choiceDistractor1 = `Accept customer verbal claim without checking active order assignment in app`;
+    choiceDistractor2 = `Collect item assigned to a different order ID to save operational time`;
+  } else if (textLower.includes('inspect') || textLower.includes('condition') || textLower.includes('eligibility') || textLower.includes('packaging')) {
+    question = `During item condition inspection for ${process}, what is the mandatory scope?`;
+    choiceCorrect = cleanInstruction;
+    choiceDistractor1 = `Reject item solely because outer packaging is missing when policy does not require it`;
+    choiceDistractor2 = `Power on, dismantle, or attempt to repair item to check functionality`;
+  } else if (textLower.includes('accept') || textLower.includes('reject') || textLower.includes('uncertain') || textLower.includes('borderline')) {
+    question = `When evaluating acceptance or rejection during ${process}, what rule governs uncertain conditions?`;
+    choiceCorrect = cleanInstruction;
+    choiceDistractor1 = `Invent an unapproved rule for borderline conditions without contacting supervisor`;
+    choiceDistractor2 = `Guarantee refund approval timing or guarantee refund directly to customer`;
+  } else if (textLower.includes('unavailable') || textLower.includes('mismatch') || textLower.includes('dispute') || textLower.includes('damage') || textLower.includes('exception')) {
+    question = `When handling an exception or customer dispute during ${process}, what is the required response?`;
+    choiceCorrect = cleanInstruction;
+    choiceDistractor1 = `Mark pickup as complete when customer is unavailable or details mismatch`;
+    choiceDistractor2 = `Alter recorded check outcome or argue with customer to end disagreement`;
+  } else if (textLower.includes('verify') || textLower.includes('check') || textLower.includes('code') || textLower.includes('serial') || textLower.includes('sku')) {
+    question = `What is the required verification protocol for: "${instruction.slice(0, 70)}"?`;
+    choiceCorrect = cleanInstruction;
+    choiceDistractor1 = `Perform visual glance only and skip comparing documented identifiers`;
+    choiceDistractor2 = `Assume compliance if no immediate error code or alarm was displayed`;
   }
 
   let title = item.task_title || toActionTitle(`${item.action_verb || 'Execute'} ${instruction}`, 6);
@@ -670,9 +642,9 @@ function createScenarioQuestionFromStep(
   return {
     title,
     question,
-    choiceCorrect: toActionTitle(choiceCorrect, 14),
-    choiceDistractor1: toActionTitle(choiceDistractor1, 14),
-    choiceDistractor2: toActionTitle(choiceDistractor2, 14),
+    choiceCorrect: toActionTitle(choiceCorrect, 16),
+    choiceDistractor1: toActionTitle(choiceDistractor1, 16),
+    choiceDistractor2: toActionTitle(choiceDistractor2, 16),
   };
 }
 
@@ -884,13 +856,30 @@ export function generateLessonFromOperationalBlueprint(
       }
     });
 
+    const matchingRawItem = steps[idx] || (steps as any)[idx];
+    let selectedComponent: StepComponentType = 'choice_list';
+    if (matchingRawItem && matchingRawItem.component && ['choice_list', 'code_match', 'number_choice', 'scene_pick', 'photo_hotspot'].includes(matchingRawItem.component)) {
+      selectedComponent = matchingRawItem.component as StepComponentType;
+    } else {
+      const textLower = `${simStep.title} ${simStep.taskItem} ${simStep.question}`.toLowerCase();
+      if (/order\s*id|return\s*id|serial|imei|barcode|sku|code/i.test(textLower)) {
+        selectedComponent = 'code_match';
+      } else if (/inspect|condition|seal|damage|liquid|tamper|packaging|photo/i.test(textLower)) {
+        selectedComponent = 'photo_hotspot';
+      } else if (/accept|reject|eligible|match|compare|valid|dispute/i.test(textLower)) {
+        selectedComponent = 'scene_pick';
+      } else if (/quantity|count|wait|time|units|sla/i.test(textLower)) {
+        selectedComponent = 'number_choice';
+      }
+    }
+
     return {
       id: `step_${idx + 1}`,
       order: idx + 1,
       title: cleanTitle,
       icon: '📋',
       purpose: idx % 2 === 0 ? 'skill' : 'understanding',
-      component: 'choice_list',
+      component: selectedComponent,
       screen: {
         header: `Step ${idx + 1}: ${cleanTitle}`,
         info: simStep.evidence || simStep.why,
@@ -913,6 +902,25 @@ export function generateLessonFromOperationalBlueprint(
       hotspots: null,
     };
   });
+
+  // Construct differentiated scenario collections across learning experiences
+  const watchSteps = simulatorSteps.map((s, idx) => ({
+    ...s,
+    question: `Demonstration Phase: Observe standard procedure for ${s.taskOrder || `Step ${idx + 1}`}`,
+    coachTip: `Watch: ${s.why}`,
+  }));
+
+  const practiceSteps = simulatorSteps.map((s) => ({
+    ...s,
+    // Practice includes step-by-step coach tips and hints
+  }));
+
+  const testSteps = simulatorSteps.map((s, idx) => ({
+    ...s,
+    question: `Solo Assessment: ${s.question}`,
+    coachTip: 'Solo Check: Make decision independently without hints.',
+    hint: 'No hint available during solo assessment check.',
+  }));
 
   const firstImpact = (opBlueprint.customer_or_business_impact || [])[0];
   const customerImpact = (typeof firstImpact === 'string' ? firstImpact : firstImpact?.impact || (firstImpact as any)?.text) || `Adhering to ${process} ensures service quality and safety.`;
@@ -1072,9 +1080,9 @@ export function generateLessonFromOperationalBlueprint(
       },
     },
     scenarios: {
-      watch: simulatorSteps,
-      practice: simulatorSteps,
-      test: simulatorSteps,
+      watch: watchSteps,
+      practice: practiceSteps,
+      test: testSteps,
     },
     floor_checklist: simulatorSteps.map((s, idx) => ({
       id: `fc_${idx + 1}`,

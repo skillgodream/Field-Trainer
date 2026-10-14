@@ -451,3 +451,193 @@ export interface BlueprintV1 {
   takeaways: string[];
   common_mistakes: string[];
 }
+
+// ============================================================================
+// PROGRESSIVE SOP INTELLIGENCE CHAT TYPES
+// ============================================================================
+
+export type SopWorkflowStage =
+  | 'UPLOADED'
+  | 'EXTRACTING'
+  | 'EXTRACTION_REVIEW'
+  | 'CLARIFICATION'
+  | 'BLUEPRINT_REVIEW'
+  | 'APPROVED_FOR_GENERATION'
+  | 'GENERATION_COMPLETE'
+  | 'EXTRACTION_FAILED'
+  | 'VALIDATION_FAILED'
+  | 'BLOCKED_CRITICAL_GAP';
+
+export type ProvenanceCategory =
+  | 'VERBATIM_SOURCE'
+  | 'STRUCTURED_INTERPRETATION'
+  | 'USER_SUPPLEMENTARY'
+  | 'SYSTEM_INFERRED';
+
+export interface ExtractedRequirement {
+  id: string;
+  type: 'task' | 'prerequisite' | 'decision' | 'exception' | 'escalation' | 'control' | 'completion';
+  title: string;
+  instruction: string;
+  category?: StepCategoryType;
+  provenance: ProvenanceCategory;
+  sourceRef: string;
+  sourceText: string;
+  isCriticalControl?: boolean;
+  evidenceRequired?: string;
+  sequenceNumber?: number;
+}
+
+export interface ExtractionReport {
+  documentIdentity: {
+    filename: string;
+    docTitle: string;
+    docRef?: string;
+    version?: string;
+    uploadedAt: string;
+    wordCount: number;
+    pageCount: number;
+    fileHash?: string;
+  };
+  documentPurpose: string;
+  intendedOutcome: string;
+  extractedRequirements: ExtractedRequirement[];
+  stepsCount: number;
+  prerequisitesCount: number;
+  decisionsCount: number;
+  exceptionsCount: number;
+  criticalControlsCount: number;
+  missingInfoCount: number;
+  contradictionsAndAmbiguities: {
+    id: string;
+    topic: string;
+    description: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    sourceRef?: string;
+    isBlocking: boolean;
+  }[];
+  coverageStatus: {
+    isComplete: boolean;
+    wordCount: number;
+    pageCount: number;
+    limitationDetails?: string;
+  };
+}
+
+export interface UnresolvedIssue {
+  id: string;
+  category: 'safety' | 'conflict' | 'decision_criteria' | 'completion' | 'training_preference';
+  description: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  sourceRef?: string;
+  isBlocking: boolean;
+  resolved: boolean;
+  resolutionText?: string;
+}
+
+export interface ClarificationOption {
+  id: string;
+  label: string;
+  description?: string;
+  isCompliantWithSource?: boolean;
+}
+
+export interface ClarificationQuestion {
+  questionId: string;
+  questionText: string;
+  reason: string;
+  category: 'safety' | 'conflict' | 'decision_criteria' | 'completion' | 'training_preference';
+  sourceRef?: string;
+  options?: ClarificationOption[];
+  isMandatory: boolean;
+  consequenceOfLeavingUnanswered: string;
+  userAnswer?: {
+    text: string;
+    selectedOptionId?: string;
+    note?: string;
+    answeredAt: string;
+    author?: string;
+  };
+  status: 'pending' | 'answered' | 'skipped';
+}
+
+export interface SupplementaryInstruction {
+  id: string;
+  author: string;
+  timestamp: string;
+  instructionText: string;
+  approvalStatus: 'approved' | 'pending' | 'rejected';
+  scope: string;
+  provenance: 'USER_SUPPLEMENTARY';
+  sourceConflict?: string;
+}
+
+export interface BlueprintTaskItem {
+  id: string;
+  ctmRequirementId: string;
+  title: string;
+  instruction: string;
+  category: StepCategoryType;
+  actionVerb: string;
+  whyItMatters?: string;
+  criticalControl?: boolean;
+  observableAction?: string;
+  evidenceRequired?: string;
+  sourceRef: string;
+  sourceText: string;
+  provenance: ProvenanceCategory;
+}
+
+export interface LearningBlueprint {
+  operationalOutcome: string;
+  tasks: BlueprintTaskItem[];
+  prerequisites: { id: string; requirement: string; sourceRef: string }[];
+  decisionPoints: { id: string; situation: string; decision: string; action: string; sourceRef: string }[];
+  exceptions: { id: string; trigger: string; resolution: string; sourceRef: string }[];
+  criticalControls: { id: string; rule: string; rationale: string; isStatutory?: boolean; sourceRef: string }[];
+  learningGoals: { id: string; goal: string; bloomLevel: string }[];
+  experienceCoverage: {
+    teachMe: boolean;
+    showMe: boolean;
+    guideMe: boolean;
+    testMe: boolean;
+  };
+  unresolvedItems: string[];
+  approvalStatus: 'draft' | 'under_review' | 'approved';
+  approvedBy?: string;
+  approvedAt?: string;
+  version: number;
+}
+
+export interface ProgressiveSopSession {
+  sessionId: string;
+  currentStage: SopWorkflowStage;
+  stepNumber: number; // 1..10
+  sourceDoc: {
+    filename: string;
+    rawText: string;
+    wordCount: number;
+    pageCount: number;
+    fileHash: string;
+    confirmationText: string;
+    mimeType: string;
+    extractedAt: string;
+    fileBase64?: string;
+    diagnostics?: any;
+  };
+  extractionReport?: ExtractionReport;
+  unresolvedIssues: UnresolvedIssue[];
+  clarificationQuestions: ClarificationQuestion[];
+  currentQuestionIndex: number;
+  supplementaryInstructions: SupplementaryInstruction[];
+  learningBlueprint?: LearningBlueprint;
+  canonicalTaskModel?: any;
+  generatedLesson?: Lesson;
+  validationResult?: {
+    isValid: boolean;
+    blockingErrors: string[];
+    warnings: string[];
+  };
+  updatedAt: string;
+}
+
