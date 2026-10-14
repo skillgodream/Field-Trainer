@@ -374,9 +374,141 @@ const plan6 = planKnowItSlides(shortSopLesson);
 assert(plan6.slides.some(s => s.type === 'WELCOME'), 'Short SOP retains WELCOME slide');
 assert(plan6.slides.some(s => s.type === 'OBJECTIVES'), 'Short SOP retains OBJECTIVES slide');
 assert(plan6.slides.some(s => s.type === 'IMPORTANT_RULE'), 'Short SOP retains IMPORTANT_RULE slide');
-assert(plan6.slides.some(s => s.type === 'COMPLETION'), 'ShortSN SOP retains COMPLETION slide');
+assert(plan6.slides.some(s => s.type === 'COMPLETION'), 'Short SOP retains COMPLETION slide');
 console.log('✅ TEST 6 PASSED: Normal short SOP successfully retains standard slide structure.\n');
 
+// ============================================================================
+// TEST 7: MASSIVE 104-STEP SOP (INCIDENT REPRODUCTION & VALIDATION)
+// ============================================================================
+console.log('TEST 7: Massive 104-step SOP deck limit and anti-corruption verification');
+const massive104Lesson: Lesson = {
+  id: 'lesson-massive-104',
+  title: 'Standard Return Pickup Workflow',
+  subtitle: 'High-volume logistics return process',
+  category: 'Safety' as any,
+  color: 'sky',
+  accentColor: '#0ea5e9',
+  stepsCount: 104,
+  durationMinutes: 45,
+  level: 'Advanced',
+  progress: 0,
+  masteryPercentage: 0,
+  artType: 'clipboard',
+  description: 'Complete returns process',
+  operationalBlueprint: {
+    document_identity: { doc_title: 'Return Pickup SOP', doc_ref: 'RET-PU-SOP-001', version: '1.0' },
+    role: 'Field Associate / Delivery Partner',
+    process: 'Standard Return Pickup Workflow',
+    purpose: 'Verify, inspect, and process all customer returns consistently.',
+    scope: 'Returns Operations',
+    prerequisites: [
+      { text: 'Equip handheld mobile barcode scanner with full battery charge', source_ref: 'p1', source_text: 'scanner' },
+      { text: 'Prepare tamper-evident return polybags and seal stickers', source_ref: 'p2', source_text: 'polybags' },
+    ],
+    tools_and_systems: [
+      { name: 'Logistics Mobile App', purpose: 'Barcode scanning and customer verification', never_do: 'Bypass OTP', source_ref: 't1', source_text: 'app' },
+    ],
+    terminology: [],
+    decision_points: [
+      { situation: 'Customer item seal is broken upon inspection', action: 'Photograph discrepancy and mark as damaged in app', decision: 'Seal check', source_ref: 'd1', source_text: 'seal' },
+    ],
+    exceptions: [],
+    escalations: [],
+    critical_controls: [
+      { rule: 'Never accept unsealed electronics without verifying serial number.', rationale: 'Fraud prevention', source_ref: 'c1', source_text: 'serial' },
+    ],
+    safety_rules: [],
+    quality_rules: [],
+    customer_or_business_impact: [],
+    common_mistakes: [
+      { mistake: 'Accepting return without scanning package barcode', prevention: 'Scan package before handing customer receipt', source_ref: 'm1', source_text: 'scan' },
+    ],
+    source_evidence: [],
+    confidence: 1.0,
+    operational_steps: Array.from({ length: 104 }, (_, i) => ({
+      instruction: `Execute verified return verification sub-step ${i + 1} with barcode recording.`,
+      task_title: `Return Verification Step ${i + 1}`,
+      category: 'DO',
+      action_verb: 'Verify',
+      source: { source_ref: `step-${i + 1}`, page_or_section: `Page ${Math.floor(i / 10) + 1}`, source_text: `Step ${i + 1} text` },
+    })),
+  },
+};
+
+const plan7 = planKnowItSlides(massive104Lesson);
+assert(plan7.slides.length <= 18, `Massive 104-step SOP constrained to <= 18 slides (got ${plan7.slides.length})`);
+
+// Ensure no slide contains the corrupted joined titles or duplicate strings
+for (const s of plan7.slides) {
+  assert(!s.title.includes(' & 104 Steps'), `Slide title must not contain repeated '& 104 Steps': "${s.title}"`);
+  assert(!s.title.includes('(8/12) &'), `Slide title must not contain concatenated page indicators: "${s.title}"`);
+  if (s.content) {
+    const lines = s.content.split('\n');
+    const hasRepeatedIntro = lines.filter(l => l.includes('Key operational stages')).length > 1;
+    assert(!hasRepeatedIntro, `Slide content must not duplicate identical overview sentences: "${s.content}"`);
+  }
+  if (s.type === 'SECTION_INTRO') {
+    assert((s.fl || []).length <= 25, `SECTION_INTRO must not accumulate 40+ merged checklist items (got ${(s.fl || []).length})`);
+  }
+}
+console.log('✅ TEST 7 PASSED: Massive 104-step SOP successfully constrained without title concatenation or content duplication.\n');
+
+// ============================================================================
+// TEST 8: CROSS-DOMAIN SOURCE GROUNDING & DECOUPLING
+// ============================================================================
+console.log('TEST 8: Cross-domain source grounding (Hotel vs Returns Logistics)');
+const hotelLesson: Lesson = {
+  id: 'lesson-hotel',
+  title: 'Hotel Housekeeping Sanitization',
+  subtitle: 'Hospitality room turnover',
+  category: 'Safety' as any,
+  color: 'lilac',
+  accentColor: '#9333ea',
+  stepsCount: 3,
+  durationMinutes: 10,
+  level: 'Beginner',
+  progress: 0,
+  masteryPercentage: 0,
+  artType: 'clipboard',
+  description: 'Sanitize guest rooms',
+  operationalBlueprint: {
+    document_identity: { doc_title: 'Room Sanitization SOP', doc_ref: 'HOTEL-HSK-01', version: '2.0' },
+    role: 'Housekeeping Attendant',
+    process: 'Guest Room Sanitization',
+    purpose: 'Deliver hygienic guest rooms.',
+    scope: 'Guest floors',
+    prerequisites: [{ text: 'Wear nitrile protective gloves', source_ref: 'p1', source_text: 'gloves' }],
+    tools_and_systems: [{ name: 'Microfiber cloth', purpose: 'Surface wiping', never_do: 'Clean floor then bed', source_ref: 't1', source_text: 'cloth' }],
+    terminology: [],
+    decision_points: [],
+    exceptions: [],
+    escalations: [],
+    critical_controls: [{ rule: 'Discard used cleaning cloths after each bathroom.', rationale: 'Prevent cross-contamination', source_ref: 'c1', source_text: 'cloth' }],
+    safety_rules: [],
+    quality_rules: [],
+    customer_or_business_impact: [],
+    common_mistakes: [],
+    source_evidence: [],
+    confidence: 1.0,
+    operational_steps: [
+      { instruction: 'Strip bed linens and inspect mattress protector.', task_title: 'Strip Linens', category: 'DO', action_verb: 'Strip', source: { source_ref: 's1', page_or_section: '1', source_text: 'Strip bed' } },
+      { instruction: 'Spray sanitizer on high-touch desk and door surfaces.', task_title: 'Disinfect Surfaces', category: 'DO', action_verb: 'Spray', source: { source_ref: 's2', page_or_section: '1', source_text: 'Spray sanitizer' } },
+      { instruction: 'Mop floor starting from farthest corner toward exit door.', task_title: 'Mop Floor', category: 'DO', action_verb: 'Mop', source: { source_ref: 's3', page_or_section: '2', source_text: 'Mop floor' } },
+    ],
+  },
+};
+
+const hotelPlan = planKnowItSlides(hotelLesson);
+assert(hotelPlan.title === 'Hotel Housekeeping Sanitization', 'Hotel plan retains source title');
+assert(Boolean(hotelPlan.slides[0]?.role?.includes('Housekeeping Attendant')), 'Hotel plan retains Housekeeping role');
+
+// Returns plan must NOT have Housekeeping concepts
+assert(!plan7.slides[0]?.role?.includes('Housekeeping'), 'Logistics Returns deck does NOT inherit Housekeeping role');
+assert(Boolean(plan7.slides[0]?.role?.includes('Field Associate')), 'Logistics Returns deck correctly uses Field Associate role');
+console.log('✅ TEST 8 PASSED: Cross-domain decoupling verified between Hospitality and Logistics.\n');
+
 console.log('================================================================');
-console.log('ALL KNOW-IT PLANNER TRUNCATION FIX TESTS PASSED (6/6)');
+console.log('ALL KNOW-IT PLANNER TESTS PASSED (8/8)');
 console.log('================================================================');
+
+

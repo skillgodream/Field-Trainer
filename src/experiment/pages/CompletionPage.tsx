@@ -6,8 +6,8 @@ export const CompletionPage: React.FC<{
   slide: Slide;
   onNext: () => void;
 }> = ({ slide }) => {
-  const nextTitle = slide.next || 'Next mode: guide me';
-  const nextSubtitle = slide.nb || 'Practise the steps with live coach guidance beside you.';
+  const nextTitle = slide.next || 'Next: Practice & Application';
+  const nextSubtitle = slide.nb || 'Continue to interactive walkthrough and guided practice.';
 
   return (
     <div className="done flex flex-col items-center justify-center text-center h-full p-4 sm:p-6 select-none my-auto">
@@ -19,13 +19,8 @@ export const CompletionPage: React.FC<{
         strokeWidth="2.5" 
         className="conf mb-4 animate-in zoom-in duration-500"
       >
-        {/* Premium translucent backing circle for massive contrast */}
         <circle cx="12" cy="12" r="10" fill="#FEF3C7" stroke="none" />
-        
-        {/* High contrast outline */}
         <circle cx="12" cy="12" r="10" stroke="#F0A030" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        
-        {/* Extra thick checkmark line */}
         <polyline 
           points="8 12 11 15 16 9" 
           stroke="#F0A030" 
@@ -37,12 +32,12 @@ export const CompletionPage: React.FC<{
 
       {/* 2. Slide Title */}
       <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight mb-2">
-        {slide.title || 'Theory mastery achieved'}
+        {slide.title || 'Training Overview Completed'}
       </h2>
 
       {/* 3. Lead description */}
       <p className="text-sm font-semibold text-slate-500 max-w-sm leading-relaxed mb-6">
-        {slide.content || "You've reviewed the operational logic. Ready for interactive floor practice?"}
+        {slide.content || "You've reviewed the operational logic and standards. Ready for hands-on practice?"}
       </p>
 
       {/* 4. Recommended Next Action Panel */}
@@ -60,3 +55,4 @@ export const CompletionPage: React.FC<{
     </div>
   );
 };
+

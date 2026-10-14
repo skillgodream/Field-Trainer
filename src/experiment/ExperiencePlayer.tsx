@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SlidePlan } from './types';
 import { Renderer } from './Renderer';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Text, AccentProvider, getAccentForSlideType } from './tokens';
 import { ChevronLeft } from 'lucide-react';
 
@@ -16,6 +17,13 @@ export function ExperiencePlayer({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [decisionSolved, setDecisionSolved] = useState<boolean>(false);
+
+  console.log('ExperiencePlayer plan:', plan);
+  if (!plan || !plan.slides) return (
+    <div className="p-10 text-red-500 font-bold text-xl bg-white border-4 border-red-500">
+      CRITICAL ERROR: Plan object is invalid. Plan: {JSON.stringify(plan)}
+    </div>
+  );
 
   const slide = plan.slides[currentIndex];
   const isDecision = slide?.type === 'DECISION';
@@ -100,15 +108,17 @@ export function ExperiencePlayer({
         {/* 2. SLIDE BODY CONTAINER - Full screen padding-0 for welcome screen */}
         <div className={`flex-1 overflow-y-auto animate-in fade-in duration-200 ${isWelcome ? 'p-0' : 'px-4 py-4'} bg-[#050B18]`}>
           <AccentProvider value={accent}>
-            <Renderer
-              slide={slide}
-              onChoiceSelect={handleChoice}
-              feedback={feedback}
-              onNext={handleNext}
-              slideIndex={currentIndex}
-              totalSlides={plan.slides.length}
-              onClose={onClose}
-            />
+            <ErrorBoundary>
+              <Renderer
+                slide={slide}
+                onChoiceSelect={handleChoice}
+                feedback={feedback}
+                onNext={handleNext}
+                slideIndex={currentIndex}
+                totalSlides={plan.slides.length}
+                onClose={onClose}
+              />
+            </ErrorBoundary>
           </AccentProvider>
         </div>
 

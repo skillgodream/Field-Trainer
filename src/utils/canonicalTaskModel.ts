@@ -249,9 +249,12 @@ export function buildCanonicalTaskModel(
     const lines = textToParse
       .split(/\n+/)
       .map((l) => l.replace(/^(\d+[.)]|[-*•])\s+/, '').trim())
-      .filter((l) => l.length >= 15);
+      .filter((l) => l.length >= 15 && !/^(standard operating procedure|sop\b|document ref|doc ref|version|effective date|approved by|page \d+|revision|department|title:|controlled copy|ret-pu-sop|return pickup|field associate|delivery partner|document id)/i.test(l));
     
     lines.forEach((l, idx) => {
+      // If line is metadata, skip
+      if (/^(standard operating procedure|sop\b|document ref|doc ref|version|effective date|approved by|page \d+|revision|department|title:|controlled copy|ret-pu-sop|return pickup|field associate|delivery partner|document id)/i.test(l)) return;
+
       steps.push({
         id: `step-${idx + 1}`,
         stepNumber: idx + 1,

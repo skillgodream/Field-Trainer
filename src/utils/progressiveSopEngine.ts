@@ -783,7 +783,7 @@ export async function generateSopDeck(
     const res = await fetch(getFetchUrl('/api/gemini/generate-blueprint'), {
       method: 'POST',
       headers: getApiHeaders(),
-      signal: AbortSignal.timeout(typeof window === 'undefined' ? 100 : 60000),
+      signal: AbortSignal.timeout(typeof window === 'undefined' ? 100 : 120000),
       body: JSON.stringify({
         rawText: doc.rawText,
         fileBase64: doc.fileBase64,

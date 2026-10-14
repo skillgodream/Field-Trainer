@@ -102,7 +102,8 @@ function clusterStepsIntoScenes(steps: OperationalBlueprint['operational_steps']
 
     if (currentGroup.length === 0) {
       currentPhase = stepPhase;
-      currentTitle = step.task_title || `Scene ${clusters.length + 1}: ${stepPhase.replace(/_/g, ' ')}`;
+      const cleanPhaseName = stepPhase.charAt(0).toUpperCase() + stepPhase.slice(1).replace(/_/g, ' ');
+      currentTitle = step.task_title || (step.instruction ? step.instruction.trim().slice(0, 45) : `${cleanPhaseName} Part ${clusters.length + 1}`);
     }
 
     currentGroup.push(step);
@@ -597,7 +598,7 @@ export function planVideoDemonstration(blueprint: OperationalBlueprint): VideoDe
     // Ensure unique distinct scene title
     let distinctTitle = primaryTaskTitle;
     if (plannedClips.some(p => p.title.toLowerCase() === distinctTitle.toLowerCase())) {
-      distinctTitle = `Scene ${sceneIndex}: ${distinctTitle}`;
+      distinctTitle = `${primaryTaskTitle} (Part ${sceneIndex})`;
     }
 
     plannedClips.push({

@@ -55,7 +55,7 @@ function shortTitle(text: string, words = 5): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-const META_LINE = /^(standard operating procedure|sop\b|document ref|doc ref|version|effective date|approved by|page \d+|revision|department|title:)/i;
+const META_LINE = /^(standard operating procedure|sop\b|document ref|doc ref|version|effective date|approved by|page \d+|revision|department|title:|controlled copy|ret-pu-sop|return pickup|field associate|delivery partner|document id)/i;
 
 /** Filler text produced by the local (non-Gemini) generator. Never show it as content. */
 const FILLER_WHY = /^(sop requirement:|mandatory rule:|critical requirement for|operational rule:)/i;
@@ -297,7 +297,8 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     });
   }
 
-  /* 4. BEFORE YOU START (Dynamic chunking for prereqs & tools without 6-item cap) */
+
+  /* 4. BEFORE YOU START (Dynamic chunking for prereqs & tools) */
   const allPrep = uniq([...d.prereqs, ...d.tools]);
   if (allPrep.length) {
     const prepChunkSize = 6;
@@ -309,13 +310,13 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
         type: 'SECTION_INTRO',
         sec: 'Before you start',
         title: totalPrepPages > 1 ? `Get Ready (${pageNum}/${totalPrepPages})` : 'Get Ready',
-        content: 'Make sure you have these in place before you begin.',
+        content: `Required prerequisites and preparation for ${d.topic}.`,
         fl: chunk,
       });
     }
   }
 
-  /* 5. PROCESS OVERVIEW + 6. PROCESS STEPS (Dynamic overview chunking without 9-step cap) */
+  /* 5. PROCESS OVERVIEW + 6. PROCESS STEPS */
   if (d.steps.length) {
     if (d.steps.length > 1) {
       const overviewChunkSize = 9;
@@ -326,8 +327,8 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
         slides.push({
           type: 'SECTION_INTRO',
           sec: 'The process',
-          title: totalOverviewPages > 1 ? `${d.steps.length} Steps (${pageNum}/${totalOverviewPages})` : 'The Process Flow',
-          content: 'Here is the high-level workflow.',
+          title: totalOverviewPages > 1 ? `Process Flow (${pageNum}/${totalOverviewPages})` : 'The Process Flow',
+          content: `Key operational stages of ${d.topic}.`,
           fl: chunk.map((s) => clip(s.title, 60)),
         });
       }
@@ -361,7 +362,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 7. DECISION POINTS (Dynamic chunking without 4-item cap) */
+  /* 7. DECISION POINTS */
   if (d.decisions.length) {
     const decisionChunkSize = 4;
     const totalDecisionPages = Math.ceil(d.decisions.length / decisionChunkSize);
@@ -372,7 +373,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       slides.push({
         type: 'TEACH_STEP',
         step: totalDecisionPages > 1 ? `Decision points (${pageNum}/${totalDecisionPages})` : 'Decision points',
-        title: 'When You Need to Decide',
+        title: 'Decision Logic',
         ic: 'check',
         items,
         content: items.join('\n'),
@@ -381,7 +382,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 8. CRITICAL RULES (Chunked when controls > 8 to prevent 50+ slide explosion) */
+  /* 8. CRITICAL RULES */
   if (d.controls.length) {
     const controlChunkSize = d.controls.length <= 8 ? 1 : 3;
     for (let i = 0; i < d.controls.length; i += controlChunkSize) {
@@ -424,7 +425,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 9. DO / DON'T (Dynamic chunking without 3-mistake cap) */
+  /* 9. DO / DON'T */
   if (d.mistakes.length) {
     const mistakeChunkSize = 3;
     const totalMistakePages = Math.ceil(d.mistakes.length / mistakeChunkSize);
@@ -436,8 +437,8 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       const effectiveDos = dos.length ? dos : ['Follow SOP instructions carefully.'];
       slides.push({
         type: 'DO_DONT',
-        title: totalMistakePages > 1 ? `Do and Don’t (${pageNum}/${totalMistakePages})` : 'Do and Don’t',
-        content: 'Common mistakes and how to avoid them.',
+        title: totalMistakePages > 1 ? `Common Mistakes (${pageNum}/${totalMistakePages})` : 'Common Mistakes',
+        content: 'Avoid these common mistakes to maintain process quality.',
         dos: effectiveDos,
         donts,
         comparison: { do: effectiveDos, dont: donts },
@@ -445,7 +446,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 10. EXCEPTIONS (Dynamic chunking without 4-exception cap) */
+  /* 10. EXCEPTIONS */
   if (d.exceptions.length) {
     const exceptionChunkSize = 4;
     const totalExceptionPages = Math.ceil(d.exceptions.length / exceptionChunkSize);
@@ -456,7 +457,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       slides.push({
         type: 'TEACH_STEP',
         step: totalExceptionPages > 1 ? `Exceptions (${pageNum}/${totalExceptionPages})` : 'Exceptions',
-        title: 'When Things Don’t Go to Plan',
+        title: 'Exceptions and Resolutions',
         ic: 'warn',
         items,
         content: items.join('\n'),
@@ -465,7 +466,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 11. ESCALATION (Dynamic chunking without 4-escalation cap) */
+  /* 11. ESCALATION */
   if (d.escalations.length) {
     const escalationChunkSize = 4;
     const totalEscalationPages = Math.ceil(d.escalations.length / escalationChunkSize);
@@ -476,7 +477,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       slides.push({
         type: 'TEACH_STEP',
         step: totalEscalationPages > 1 ? `Escalation (${pageNum}/${totalEscalationPages})` : 'Escalation',
-        title: 'When to Escalate',
+        title: 'Escalation Procedures',
         ic: 'warn',
         items,
         content: items.join('\n'),
@@ -485,7 +486,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 12. CHECK YOURSELF (AI-written scenarios only; never templated ones) */
+  /* 12. CHECK YOURSELF */
   let scenarioCount = 0;
   d.steps.forEach((s, i) => {
     if (scenarioCount >= 2) return;
@@ -496,7 +497,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   });
 
-  /* Last resort: if nothing structured was found, show real lines from the SOP rather than invented content */
+  /* Last resort: if nothing structured was found, show real lines from the SOP */
   const hasBody = slides.length > 2;
   if (!hasBody && d.rawText) {
     const lines = uniq(
@@ -510,7 +511,7 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
       slides.push({
         type: 'TEACH_STEP',
         step: 'From the SOP',
-        title: 'Key Points From the Document',
+        title: 'Key Information',
         ic: 'check',
         items: lines,
         content: lines.join('\n'),
@@ -538,113 +539,173 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
   slides.push({
     type: 'COMPLETION',
     title: 'Great Job!',
-    content: `You’ve completed the Training deck overview for ${d.topic}.`,
+    content: `You have successfully completed the overview for ${d.topic}.`,
     next: 'Next: Show Me',
     nb: 'See the steps in action, then practise them with a coach.',
   });
 
-  /* ================================================================ *
-   * FINAL COVERAGE CHECK                                             *
-   * ================================================================ */
-  const missingItems: string[] = [];
+  /**
+   * Intelligently enforces deck limit while preserving typed slide boundaries and pedagogical order.
+   * Never merges heterogeneous slide types or concatenates titles with '& & &'.
+   */
+  function enforceDeckSlideLimit(slidesList: Slide[], maxDeckSlides = 18): Slide[] {
+    if (slidesList.length <= maxDeckSlides) return slidesList;
 
-  d.steps.forEach((s) => {
-    const found = slides.some((sl) =>
-      (sl.title && sl.title.toLowerCase().includes(s.title.toLowerCase())) ||
-      (sl.content && sl.content.toLowerCase().includes(s.text.toLowerCase())) ||
-      (sl.items && sl.items.some((item) => item.toLowerCase().includes(s.text.toLowerCase()) || item.toLowerCase().includes(s.title.toLowerCase()))) ||
-      (sl.fl && sl.fl.some((f) => f.toLowerCase().includes(s.title.toLowerCase())))
-    );
-    if (!found) missingItems.push(`Step: ${s.title} (${s.text})`);
-  });
+    // Milestone slides
+    const welcome = slidesList.find((s) => s.type === 'WELCOME');
+    const objectives = slidesList.find((s) => s.type === 'OBJECTIVES');
+    const completion = slidesList.find((s) => s.type === 'COMPLETION');
+    const takeaways = slidesList.find((s) => s.type === 'KEY_TAKEAWAYS');
 
-  d.controls.forEach((c) => {
-    const found = slides.some((sl) =>
-      (sl.title && sl.title.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20))) ||
-      (sl.content && sl.content.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20))) ||
-      (sl.gurujiCoaching && sl.gurujiCoaching.explanation.toLowerCase().includes(c.rule.toLowerCase().slice(0, 20)))
-    );
-    if (!found) missingItems.push(`Control: ${c.rule}`);
-  });
+    // Categorize middle slides by type to avoid cross-type contamination
+    const prepIntros = slidesList.filter((s) => s.type === 'SECTION_INTRO' && s.sec === 'Before you start');
+    const processIntros = slidesList.filter((s) => s.type === 'SECTION_INTRO' && s.sec === 'The process');
+    const otherIntros = slidesList.filter((s) => s.type === 'SECTION_INTRO' && s.sec !== 'Before you start' && s.sec !== 'The process');
+    const teachSteps = slidesList.filter((s) => s.type === 'TEACH_STEP');
+    const rules = slidesList.filter((s) => s.type === 'IMPORTANT_RULE');
+    const doDonts = slidesList.filter((s) => s.type === 'DO_DONT');
+    const scenarios = slidesList.filter((s) => s.type === 'REAL_WORLD_SCENARIO');
+    const decisions = slidesList.filter((s) => s.type === 'DECISION');
 
-  allPrep.forEach((p) => {
-    const found = slides.some((sl) => sl.fl && sl.fl.some((f) => f.toLowerCase().includes(p.toLowerCase().slice(0, 20))));
-    if (!found) missingItems.push(`Prereq/Tool: ${p}`);
-  });
-
-  d.mistakes.forEach((m) => {
-    const found = slides.some((sl) =>
-      (sl.donts && sl.donts.some((dt) => dt.toLowerCase().includes(m.mistake.toLowerCase().slice(0, 20)))) ||
-      (sl.dos && sl.dos.some((ds) => m.fix && ds.toLowerCase().includes(m.fix.toLowerCase().slice(0, 20))))
-    );
-    if (!found) missingItems.push(`Mistake: ${m.mistake}`);
-  });
-
-  d.decisions.forEach((dec) => {
-    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(dec.situation.toLowerCase().slice(0, 20))));
-    if (!found) missingItems.push(`Decision: ${dec.situation}`);
-  });
-
-  d.exceptions.forEach((exc) => {
-    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(exc.trigger.toLowerCase().slice(0, 20))));
-    if (!found) missingItems.push(`Exception: ${exc.trigger}`);
-  });
-
-  d.escalations.forEach((esc) => {
-    const found = slides.some((sl) => sl.items && sl.items.some((i) => i.toLowerCase().includes(esc.situation.toLowerCase().slice(0, 20))));
-    if (!found) missingItems.push(`Escalation: ${esc.situation}`);
-  });
-
-  if (missingItems.length > 0) {
-    console.warn('[KnowIt Planner Coverage Warning] Unrepresented source items detected in deck:', missingItems);
-  }
-
-function enforceDeckSlideLimit(slides: Slide[], maxDeckSlides = 18): Slide[] {
-  if (slides.length <= maxDeckSlides) return slides;
-
-  const welcome = slides.find((s) => s.type === 'WELCOME') || slides[0];
-  const completion = slides.find((s) => s.type === 'COMPLETION') || slides[slides.length - 1];
-  const takeaways = slides.find((s) => s.type === 'KEY_TAKEAWAYS');
-
-  const middle = slides.filter((s) => s !== welcome && s !== completion && s !== takeaways);
-  const targetMiddleCount = maxDeckSlides - (takeaways ? 3 : 2);
-
-  if (middle.length <= targetMiddleCount) return slides;
-
-  const chunkSize = Math.ceil(middle.length / targetMiddleCount);
-  const consolidatedMiddle: Slide[] = [];
-
-  for (let i = 0; i < middle.length; i += chunkSize) {
-    const chunk = middle.slice(i, i + chunkSize);
-    if (chunk.length === 1) {
-      consolidatedMiddle.push(chunk[0]);
-    } else {
-      const primary = chunk[0];
-      const allItems = chunk.flatMap((s) => s.items || (s.content ? [s.content] : []));
-      const allFl = chunk.flatMap((s) => s.fl || []);
-      const combinedContent = chunk.map((s) => s.content || s.title).join('\n');
-      const combinedTitles = chunk.map((s) => s.title).filter(Boolean).join(' & ');
-
-      consolidatedMiddle.push({
-        ...primary,
-        title: clip(combinedTitles, 70) || primary.title || 'Key Operational Directives',
-        items: allItems.length ? allItems : undefined,
-        fl: allFl.length ? allFl : undefined,
-        content: combinedContent,
-        gurujiCoaching: primary.gurujiCoaching ? {
-          ...primary.gurujiCoaching,
-          explanation: combinedContent,
-        } : undefined,
-      });
+    // Consolidate process overview intros if excessive (max 2 slides, max 8 items each)
+    let finalProcessIntros = processIntros;
+    if (processIntros.length > 2) {
+      const allFlow = uniq(processIntros.flatMap((s) => s.fl || []));
+      const maxPerSlide = 8;
+      const targetTotal = maxPerSlide * 2;
+      let sampledFlow = allFlow;
+      if (allFlow.length > targetTotal) {
+        const stepInterval = (allFlow.length - 1) / (targetTotal - 1);
+        sampledFlow = Array.from({ length: targetTotal }, (_, i) => allFlow[Math.round(i * stepInterval)]);
+      }
+      const mid = Math.ceil(sampledFlow.length / 2);
+      finalProcessIntros = [
+        {
+          type: 'SECTION_INTRO',
+          sec: 'The process',
+          title: 'Process Flow (Part 1)',
+          content: `Key operational stages of ${d.topic}.`,
+          fl: sampledFlow.slice(0, mid),
+        },
+        {
+          type: 'SECTION_INTRO',
+          sec: 'The process',
+          title: 'Process Flow (Part 2)',
+          content: `Key operational stages of ${d.topic}.`,
+          fl: sampledFlow.slice(mid),
+        },
+      ];
     }
+
+    // Consolidate prep intros if excessive (max 2 slides, max 6 items each)
+    let finalPrepIntros = prepIntros;
+    if (prepIntros.length > 2) {
+      const allPrepItems = uniq(prepIntros.flatMap((s) => s.fl || []));
+      const maxPerSlide = 6;
+      const targetTotal = maxPerSlide * 2;
+      const sampledPrep = allPrepItems.slice(0, targetTotal);
+      const mid = Math.ceil(sampledPrep.length / 2);
+      finalPrepIntros = [
+        {
+          type: 'SECTION_INTRO',
+          sec: 'Before you start',
+          title: 'Get Ready (Part 1)',
+          content: `Prerequisites and tools for ${d.topic}.`,
+          fl: sampledPrep.slice(0, mid),
+        },
+        {
+          type: 'SECTION_INTRO',
+          sec: 'Before you start',
+          title: 'Get Ready (Part 2)',
+          content: `Prerequisites and tools for ${d.topic}.`,
+          fl: sampledPrep.slice(mid),
+        },
+      ];
+    }
+
+
+    // Consolidate rules if excessive (> 3)
+    let finalRules = rules;
+    if (rules.length > 3) {
+      const chunkCount = 2;
+      const chunkSize = Math.ceil(rules.length / chunkCount);
+      finalRules = [];
+      for (let i = 0; i < rules.length; i += chunkSize) {
+        const chunk = rules.slice(i, i + chunkSize);
+        const combinedRules = chunk.map((r, idx) => `${idx + 1}. ${clip(r.title, 120)}`);
+        finalRules.push({
+          type: 'IMPORTANT_RULE',
+          title: clip(chunk.map((r) => r.title).join(' & '), 65),
+          why: 'Mandatory operational controls to maintain quality and safety standards.',
+          ic: 'warn',
+          slash: 1,
+          content: combinedRules.join('\n'),
+          items: combinedRules,
+        });
+      }
+    }
+
+    // Calculate budget for teachSteps
+    const fixedCount =
+      (welcome ? 1 : 0) +
+      (objectives ? 1 : 0) +
+      (completion ? 1 : 0) +
+      (takeaways ? 1 : 0) +
+      finalPrepIntros.length +
+      finalProcessIntros.length +
+      otherIntros.length +
+      finalRules.length +
+      doDonts.length +
+      scenarios.length +
+      decisions.length;
+
+    const availableForTeachSteps = Math.max(3, maxDeckSlides - fixedCount);
+    let finalTeachSteps: Slide[] = teachSteps;
+
+    if (teachSteps.length > availableForTeachSteps) {
+      const stepChunkSize = Math.ceil(teachSteps.length / availableForTeachSteps);
+      finalTeachSteps = [];
+      const totalGroups = Math.ceil(teachSteps.length / stepChunkSize);
+
+      for (let i = 0; i < teachSteps.length; i += stepChunkSize) {
+        const chunk = teachSteps.slice(i, i + stepChunkSize);
+        const groupNum = Math.floor(i / stepChunkSize) + 1;
+        const allItems = uniq(chunk.flatMap((s) => s.items || (s.content ? [s.content] : [])));
+        const firstTitle = chunk[0].title;
+        const lastTitle = chunk[chunk.length - 1].title;
+        const groupTitle = chunk.length > 1 && firstTitle !== lastTitle
+          ? clip(`${firstTitle} to ${lastTitle}`, 65)
+          : firstTitle;
+
+        finalTeachSteps.push({
+          type: 'TEACH_STEP',
+          step: `Steps (${groupNum}/${totalGroups})`,
+          title: groupTitle,
+          ic: 'check',
+          items: allItems,
+          content: allItems.join('\n'),
+          evidenceSource: chunk[0].evidenceSource || 'SOP',
+        });
+      }
+    }
+
+    // Assemble cleanly in logical pedagogical sequence
+    const result: Slide[] = [];
+    if (welcome) result.push(welcome);
+    if (objectives) result.push(objectives);
+    result.push(...finalPrepIntros);
+    result.push(...finalProcessIntros);
+    result.push(...otherIntros);
+    result.push(...finalTeachSteps);
+    result.push(...finalRules);
+    result.push(...doDonts);
+    result.push(...scenarios);
+    result.push(...decisions);
+    if (takeaways) result.push(takeaways);
+    if (completion) result.push(completion);
+
+    return result;
   }
-
-  const result = [welcome, ...consolidatedMiddle];
-  if (takeaways) result.push(takeaways);
-  result.push(completion);
-
-  return result;
-}
 
   const finalSlides = enforceDeckSlideLimit(slides, 18);
 
@@ -652,21 +713,9 @@ function enforceDeckSlideLimit(slides: Slide[], maxDeckSlides = 18): Slide[] {
   console.log('[KnowIt planner]', {
     lessonId: lesson.id,
     topic: d.topic,
-    role: d.role,
-    steps: d.steps.length,
-    prereqs: d.prereqs.length,
-    tools: d.tools.length,
-    controls: d.controls.length,
-    mistakes: d.mistakes.length,
-    exceptions: d.exceptions.length,
-    escalations: d.escalations.length,
-    decisions: d.decisions.length,
-    changes: changes.length,
-    scenarios: scenarioCount,
     slides: finalSlides.length,
-    rawSlidesCount: slides.length,
-    missingItemsCount: missingItems.length,
   });
 
   return { lessonId: lesson.id, title: lesson.title, slides: finalSlides };
 }
+

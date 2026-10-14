@@ -1,6 +1,6 @@
 import React from 'react';
 import { Slide } from '../types';
-import { Text, Pill, Panel, ImageSlot, SopHeader } from '../tokens';
+import { Text, Panel, ImageSlot, SopHeader } from '../tokens';
 
 export const ImportantRulePage: React.FC<{
   slide: Slide;
@@ -9,25 +9,26 @@ export const ImportantRulePage: React.FC<{
   let why =
     slide.why ||
     slide.gurujiCoaching?.whyItMatters ||
-    'Safety and compliance boundary. Never bypass standard verification checks.';
+    'Mandatory procedure requirement. Adhere strictly to verified operational standards.';
 
   if (slide.title && why.trim().toLowerCase() === slide.title.trim().toLowerCase()) {
-    why = 'Non-negotiable operational control: skipping this check leads to compliance violations, inventory/process discrepancies, and safety risks.';
+    why = 'Non-negotiable operational standard: skipping this verification leads to procedural errors and compliance discrepancies.';
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Universal SOP Header */}
-      <SopHeader tag={slide.tag || 'Critical rule'} title="Critical operational control" />
+      {/* Universal SOP Header using dynamic title */}
+      <SopHeader tag={slide.tag || 'Critical Rule'} title={slide.title || 'Operational Control'} />
 
-      {/* 3. Visual */}
-      <ImageSlot src={slide.img} alt={slide.title} textContext={slide.title} />
+      {/* Visual media slot if available */}
+      {slide.img && <ImageSlot src={slide.img} alt={slide.title} textContext={slide.title} />}
 
-      {/* 4. Content block: Red-tinted Panel containing the rule and why it matters */}
-      <Panel type="dont" className="flex flex-col gap-3">
+      {/* Content block: Alert Panel containing the rule and why it matters */}
+      <Panel type="dont" className="flex flex-col gap-3 text-left">
         <Text styleName="panel-heading">{slide.title}</Text>
         <Text styleName="body">{why}</Text>
       </Panel>
     </div>
   );
 };
+

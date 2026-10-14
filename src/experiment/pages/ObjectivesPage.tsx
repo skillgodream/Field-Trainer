@@ -1,11 +1,12 @@
 import React from 'react';
 import { Slide } from '../types';
+import { Target, CheckCircle2, Compass, Award, ListChecks } from 'lucide-react';
 
 export const ObjectivesPage: React.FC<{
   slide: Slide;
   onNext?: () => void;
 }> = ({ slide }) => {
-  const lead = slide.lead || 'By the end of this section, you will be able to:';
+  const lead = slide.lead || 'By the end of this module, you will be able to:';
 
   let items = slide.items;
   if (!items || items.length === 0) {
@@ -18,57 +19,19 @@ export const ObjectivesPage: React.FC<{
   // Ensure content limit of dynamic goals
   const finalItems = items.slice(0, 4);
 
-  // High-fidelity line icons matching screenshot 2 contextually
-  const getGoalIcon = (text: string, index: number) => {
-    const lower = text.toLowerCase();
-    
-    // 1. Sanitizer / chemical / ratio / bottle
-    if (lower.includes('sanitizer') || lower.includes('dilut') || lower.includes('ratio') || lower.includes('mix') || lower.includes('solution')) {
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-          <path d="M10 2h4M9 6h6v3l3 4v7c0 1.1-.9 2-2 2H8a2 2 0 0 1-2-2v-7l3-4V6Z" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M6 14h12" strokeLinecap="round" />
-        </svg>
-      );
+  // Universal semantic icons based on position
+  const getGoalIcon = (index: number) => {
+    switch (index % 4) {
+      case 0:
+        return <Target className="w-5 h-5 text-[#1d3cb4]" />;
+      case 1:
+        return <CheckCircle2 className="w-5 h-5 text-[#1d3cb4]" />;
+      case 2:
+        return <Compass className="w-5 h-5 text-[#1d3cb4]" />;
+      case 3:
+      default:
+        return <Award className="w-5 h-5 text-[#1d3cb4]" />;
     }
-    // 2. High-touch / wipe / disinfect / sanitize / surfaces
-    if (lower.includes('surface') || lower.includes('wipe') || lower.includes('sanitize') || lower.includes('clean') || lower.includes('disinfect')) {
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-          <path d="M3 7a4 4 0 1 1 8 0v13H3V7Z" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M12 4h9M12 9h7M12 14h5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    }
-    // 3. Debris / dirt / dust / broom / trash
-    if (lower.includes('debris') || lower.includes('dirt') || lower.includes('dust') || lower.includes('brush') || lower.includes('trash') || lower.includes('squeegee')) {
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-          <path d="M12 2v14M5 16h14a2 2 0 0 1 2 2v2H3v-2a2 2 0 0 1 2-2Z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    }
-
-    // Default checklist/goal fallback based on index
-    if (index === 0) {
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-          <path d="M10 2h4M9 6h6v3l3 4v7c0 1.1-.9 2-2 2H8a2 2 0 0 1-2-2v-7l3-4V6Z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    }
-    if (index === 1) {
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-          <path d="M3 7a4 4 0 1 1 8 0v13H3V7Z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    }
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-5.5 h-5.5">
-        <path d="M12 2v14M5 16h14a2 2 0 0 1 2 2v2H3v-2a2 2 0 0 1 2-2Z" strokeLinecap="round" />
-      </svg>
-    );
   };
 
   return (
@@ -79,12 +42,8 @@ export const ObjectivesPage: React.FC<{
 
         <div className="space-y-2 z-10 max-w-[65%]">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-bold tracking-wide backdrop-blur-sm text-white">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-3.5 h-3.5 text-white inline shrink-0">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="6" />
-              <circle cx="12" cy="12" r="2" />
-            </svg>
-            <span className="text-white">Lesson goals</span>
+            <ListChecks className="w-3.5 h-3.5 text-white inline shrink-0" />
+            <span className="text-white">{slide.tag || 'Learning Objectives'}</span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-none text-white">
@@ -111,7 +70,7 @@ export const ObjectivesPage: React.FC<{
 
       {/* 2. Goals counter label */}
       <div className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1 mt-3">
-        {finalItems.length} GOALS
+        {finalItems.length} OBJECTIVES
       </div>
 
       {/* 3. List of Beautiful Goals cards (light style) */}
@@ -126,7 +85,7 @@ export const ObjectivesPage: React.FC<{
               <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-[#1d3cb4] rounded-l-2xl" />
 
               <div className="w-10 h-10 rounded-xl bg-[#eff6ff] text-[#1d3cb4] flex items-center justify-center shrink-0 shadow-2xs">
-                {getGoalIcon(item, index)}
+                {getGoalIcon(index)}
               </div>
 
               <div className="flex-1 space-y-0.5 text-left pr-2">
@@ -144,3 +103,4 @@ export const ObjectivesPage: React.FC<{
     </div>
   );
 };
+

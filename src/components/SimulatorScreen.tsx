@@ -392,11 +392,6 @@ export default function SimulatorScreen({
 
     return (
       <div className="w-full flex flex-col gap-2 mb-3">
-        <div className={`px-3 py-1.5 rounded-xl border ${badgeColor} text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-2 shadow-sm`}>
-          <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
-          <span>{badgeLabel}</span>
-        </div>
-
         {url ? (
           <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-slate-800 shadow-lg bg-slate-950 shrink-0">
             <img src={url} alt={currentStep.title} className="w-full h-full object-cover" />
@@ -674,58 +669,8 @@ export default function SimulatorScreen({
 
             {/* Primary Action Directive Headline */}
             <div className="mb-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-500/40 text-[10px] font-black uppercase tracking-wider text-indigo-300 shadow-sm mb-1.5">
-                <Shield size={12} className="text-indigo-400" />
-                <span>OPERATIONAL ACTION DIRECTIVE</span>
-              </div>
               <h3 className="question text-slate-100 font-bold leading-tight">{typedQuestion}</h3>
             </div>
-
-            {/* STRUCTURALLY DIFFERENTIATED MODULE 1: Operational Rationale & Cause-and-Effect */}
-            {step.why && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#1b1133] to-[#120a24] border border-[#533088]/80 text-purple-100 my-3 shadow-lg relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-600/10 rounded-full blur-xl pointer-events-none" />
-                <div className="flex items-start gap-3 relative z-10">
-                  <div className="w-9 h-9 rounded-xl bg-[#3B1E6D] text-purple-300 flex items-center justify-center shrink-0 mt-0.5 shadow-md border border-purple-500/30">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-md border border-purple-500/30">
-                        OPERATIONAL RATIONALE · WHY THIS MATTERS
-                      </span>
-                      <span className="text-[10px] font-bold text-purple-400">Risk Prevention</span>
-                    </div>
-                    <p className="text-xs font-medium text-purple-100 leading-relaxed mt-1">
-                      {step.why}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* STRUCTURALLY DIFFERENTIATED MODULE 2: On-the-Floor Practice & Watch-outs */}
-            {step.coachTip && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0b261b] to-[#061811] border border-[#196B4C]/80 text-emerald-100 my-3 shadow-lg relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-600/10 rounded-full blur-xl pointer-events-none" />
-                <div className="flex items-start gap-3 relative z-10">
-                  <div className="w-9 h-9 rounded-xl bg-[#144A36] text-emerald-300 flex items-center justify-center shrink-0 mt-0.5 shadow-md border border-emerald-500/30">
-                    <Lightbulb size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                        ON-THE-FLOOR PRACTICE · FIELD WATCH-OUT
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-400">Practical Application</span>
-                    </div>
-                    <p className="text-xs font-medium text-emerald-100 leading-relaxed mt-1">
-                      {step.coachTip}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Choices Grid with Visual Decision Gate Badges */}
             {(!step?.choices || step.choices.length < 2 || !step.choices.some((c) => c.isCorrect)) ? (
