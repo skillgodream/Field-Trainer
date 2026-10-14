@@ -90,7 +90,7 @@ export const DecisionPage: React.FC<{
     'https://images.unsplash.com/photo-1584634731339-252c581abfc5?auto=format&fit=crop&w=800&q=80';
 
   return (
-    <div className="flex flex-col gap-4 select-none pb-2">
+    <div className="h-full overflow-y-auto flex flex-col gap-4 select-none pb-4">
       {/* 1. TOP HERO CARD matching Screenshot 1 */}
       <div className="bg-gradient-to-r from-[#0a1e4a] via-[#0e2760] to-[#122b68] border border-blue-500/30 rounded-2xl sm:rounded-[22px] p-5 shadow-[0_8px_30px_rgba(10,30,74,0.35)] relative overflow-hidden flex items-center justify-between gap-3 text-left">
         {/* Subtle top specular glass highlight */}
