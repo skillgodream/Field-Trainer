@@ -1265,7 +1265,7 @@ export function generateLessonFromOperationalBlueprint(
     category,
     color,
     accentColor,
-    stepsCount: simulatorSteps.length,
+    stepsCount: orderedSteps.length,
     durationMinutes: Math.max(5, Math.ceil(simulatorSteps.length * 1.5)),
     level: 'Beginner',
     progress: 0,

@@ -326,8 +326,8 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
         slides.push({
           type: 'SECTION_INTRO',
           sec: 'The process',
-          title: totalOverviewPages > 1 ? `${d.steps.length} Steps, Start to Finish (${pageNum}/${totalOverviewPages})` : `${d.steps.length} Steps, Start to Finish`,
-          content: 'Here is the flow. Next, we go through each step.',
+          title: totalOverviewPages > 1 ? `${d.steps.length} Steps (${pageNum}/${totalOverviewPages})` : 'The Process Flow',
+          content: 'Here is the high-level workflow.',
           fl: chunk.map((s) => clip(s.title, 60)),
         });
       }
@@ -381,24 +381,48 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     }
   }
 
-  /* 8. CRITICAL RULES (All controls included without 3-rule cap) */
-  d.controls.forEach((c) => {
-    const rule = clip(c.rule, 150);
-    const why = c.why ? clip(c.why, 160) : 'Do not skip or work around this rule.';
-    slides.push({
-      type: 'IMPORTANT_RULE',
-      title: rule,
-      why,
-      ic: 'warn',
-      slash: 1,
-      content: rule,
-      gurujiCoaching: {
-        explanation: rule,
-        whyItMatters: why,
-        nextMove: 'If you cannot follow this, stop and check with your supervisor.',
-      },
-    });
-  });
+  /* 8. CRITICAL RULES (Chunked when controls > 8 to prevent 50+ slide explosion) */
+  if (d.controls.length) {
+    const controlChunkSize = d.controls.length <= 8 ? 1 : 3;
+    for (let i = 0; i < d.controls.length; i += controlChunkSize) {
+      const chunk = d.controls.slice(i, i + controlChunkSize);
+      if (chunk.length === 1) {
+        const c = chunk[0];
+        const rule = clip(c.rule, 150);
+        const why = c.why ? clip(c.why, 160) : 'Do not skip or work around this rule.';
+        slides.push({
+          type: 'IMPORTANT_RULE',
+          title: rule,
+          why,
+          ic: 'warn',
+          slash: 1,
+          content: rule,
+          gurujiCoaching: {
+            explanation: rule,
+            whyItMatters: why,
+            nextMove: 'If you cannot follow this, stop and check with your supervisor.',
+          },
+        });
+      } else {
+        const rulesList = chunk.map((c, idx) => `${idx + 1}. ${clip(c.rule, 120)}`);
+        const why = 'Mandatory controls to ensure process safety, compliance, and quality.';
+        slides.push({
+          type: 'IMPORTANT_RULE',
+          title: clip(chunk.map((c) => c.rule).join(' & '), 70),
+          why,
+          ic: 'warn',
+          slash: 1,
+          content: rulesList.join('\n'),
+          items: rulesList,
+          gurujiCoaching: {
+            explanation: rulesList.join(' | '),
+            whyItMatters: why,
+            nextMove: 'If you cannot follow these rules, stop and check with your supervisor.',
+          },
+        });
+      }
+    }
+  }
 
   /* 9. DO / DON'T (Dynamic chunking without 3-mistake cap) */
   if (d.mistakes.length) {
@@ -575,6 +599,55 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     console.warn('[KnowIt Planner Coverage Warning] Unrepresented source items detected in deck:', missingItems);
   }
 
+function enforceDeckSlideLimit(slides: Slide[], maxDeckSlides = 18): Slide[] {
+  if (slides.length <= maxDeckSlides) return slides;
+
+  const welcome = slides.find((s) => s.type === 'WELCOME') || slides[0];
+  const completion = slides.find((s) => s.type === 'COMPLETION') || slides[slides.length - 1];
+  const takeaways = slides.find((s) => s.type === 'KEY_TAKEAWAYS');
+
+  const middle = slides.filter((s) => s !== welcome && s !== completion && s !== takeaways);
+  const targetMiddleCount = maxDeckSlides - (takeaways ? 3 : 2);
+
+  if (middle.length <= targetMiddleCount) return slides;
+
+  const chunkSize = Math.ceil(middle.length / targetMiddleCount);
+  const consolidatedMiddle: Slide[] = [];
+
+  for (let i = 0; i < middle.length; i += chunkSize) {
+    const chunk = middle.slice(i, i + chunkSize);
+    if (chunk.length === 1) {
+      consolidatedMiddle.push(chunk[0]);
+    } else {
+      const primary = chunk[0];
+      const allItems = chunk.flatMap((s) => s.items || (s.content ? [s.content] : []));
+      const allFl = chunk.flatMap((s) => s.fl || []);
+      const combinedContent = chunk.map((s) => s.content || s.title).join('\n');
+      const combinedTitles = chunk.map((s) => s.title).filter(Boolean).join(' & ');
+
+      consolidatedMiddle.push({
+        ...primary,
+        title: clip(combinedTitles, 70) || primary.title || 'Key Operational Directives',
+        items: allItems.length ? allItems : undefined,
+        fl: allFl.length ? allFl : undefined,
+        content: combinedContent,
+        gurujiCoaching: primary.gurujiCoaching ? {
+          ...primary.gurujiCoaching,
+          explanation: combinedContent,
+        } : undefined,
+      });
+    }
+  }
+
+  const result = [welcome, ...consolidatedMiddle];
+  if (takeaways) result.push(takeaways);
+  result.push(completion);
+
+  return result;
+}
+
+  const finalSlides = enforceDeckSlideLimit(slides, 18);
+
   // Diagnostic
   console.log('[KnowIt planner]', {
     lessonId: lesson.id,
@@ -590,9 +663,10 @@ export function planKnowItSlides(lesson: Lesson): TeachMePlan {
     decisions: d.decisions.length,
     changes: changes.length,
     scenarios: scenarioCount,
-    slides: slides.length,
+    slides: finalSlides.length,
+    rawSlidesCount: slides.length,
     missingItemsCount: missingItems.length,
   });
 
-  return { lessonId: lesson.id, title: lesson.title, slides };
+  return { lessonId: lesson.id, title: lesson.title, slides: finalSlides };
 }
