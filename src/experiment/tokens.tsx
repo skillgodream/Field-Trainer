@@ -19,22 +19,22 @@ export type TextStyleType =
 
 export const tokens = {
   colors: {
-    navy: '#1E293B', // Slate 800
-    slate: '#475569', // Slate 600
-    muted: '#94A3B8', // Slate 400
-    page: '#FFFFFF', // White
-    surface: '#F8FAFC', // Slate 50
-    line: '#E2E8F0', // Slate 200
+    navy: '#0F1B3D',
+    slate: '#3C4660',
+    muted: '#6B7691',
+    page: '#F6F7FB',
+    surface: '#FFFFFF',
+    line: '#E3E8F4',
     accent: {
-      indigo: '#4F46E5', // Indigo 600
-      teal: '#0D9488', // Teal 600
-      plum: '#7C3AED', // Violet 600
-      ember: '#EA580C', // Orange 600
+      indigo: '#3B4FE0',
+      teal: '#0E8A9A',
+      plum: '#6B2FB0',
+      ember: '#D9541E',
     },
     semantic: {
-      green: { text: '#15803D', bg: '#DCFCE7' },
-      red: { text: '#B91C1C', bg: '#FEE2E2' },
-      amber: { text: '#B45309', bg: '#FEF3C7' },
+      green: { text: '#2FA866', bg: '#E7F5EC' },
+      red: { text: '#E5483A', bg: '#FDECEA' },
+      amber: { text: '#F0A030', bg: '#FDF3D0' },
     }
   },
   spacing: {
@@ -141,12 +141,12 @@ export const Text: React.FC<{
   className?: string;
 }> = ({ styleName, children, emphasis, className = '' }) => {
   const stylesMap: Record<TextStyleType, string> = {
-    'welcome-title': "font-['Plus_Jakarta_Sans'] text-[32px] leading-[38px] font-extrabold text-[#0F1B3D] tracking-normal normal-case",
-    'slide-title': "font-['Plus_Jakarta_Sans'] text-[26px] leading-[32px] font-extrabold text-[#0F1B3D] tracking-normal normal-case",
-    'panel-heading': "font-['Plus_Jakarta_Sans'] text-[20px] leading-[26px] font-extrabold text-[#0F1B3D] tracking-normal normal-case",
-    'body': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[18px] font-medium text-[#3C4660] tracking-normal normal-case",
-    'list-item': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[18px] font-bold text-[#0F1B3D] tracking-normal normal-case",
-    'caption': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[16px] font-bold text-[#6B7691] tracking-normal normal-case",
+    'welcome-title': "font-['Plus_Jakarta_Sans'] text-[32px] leading-[38px] font-extrabold text-white tracking-normal normal-case",
+    'slide-title': "font-['Plus_Jakarta_Sans'] text-[26px] leading-[32px] font-extrabold text-white tracking-normal normal-case",
+    'panel-heading': "font-['Plus_Jakarta_Sans'] text-[20px] leading-[26px] font-extrabold text-white tracking-normal normal-case",
+    'body': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[18px] font-medium text-slate-200 tracking-normal normal-case",
+    'list-item': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[18px] font-bold text-white tracking-normal normal-case",
+    'caption': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[16px] font-bold text-slate-400 tracking-normal normal-case",
     'pill': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[16px] font-bold tracking-normal normal-case",
     'button': "font-['Plus_Jakarta_Sans'] text-[12px] leading-[16px] font-bold tracking-normal normal-case",
     'counter': "font-['Plus_Jakarta_Sans'] text-[13px] leading-[16px] font-bold font-mono tabular-nums tracking-normal normal-case whitespace-nowrap shrink-0",
@@ -292,26 +292,27 @@ export const SopHeader: React.FC<{
 
   return (
     <div
-      className={`bg-white border border-slate-200 rounded-2xl sm:rounded-[22px] p-5 relative overflow-hidden shadow-sm flex items-center justify-between gap-3 text-left select-none ${className}`}
+      className={`bg-gradient-to-r from-[#0d2260] via-[#10348a] to-[#4c1d95] border border-blue-500/30 rounded-2xl sm:rounded-[22px] p-5 relative overflow-hidden shadow-[0_8px_30px_rgba(13,34,96,0.35)] flex items-center justify-between gap-3 text-left select-none ${className}`}
     >
       {/* Subtle top specular glass highlight */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-slate-100 pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-blue-400/30 to-transparent pointer-events-none" />
+      <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
 
       {/* Left text block */}
       <div className="flex-1 min-w-0 pr-2">
-        {/* Simple Badge */}
-        <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-700 select-none mb-2">
+        {/* Vibrant Gradient Pill Badge */}
+        <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-gradient-to-r from-[#1d4ed8] to-[#6366f1] border border-blue-300/30 text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-white shadow-[0_2px_10px_rgba(37,99,235,0.4)] select-none mb-2">
           {tag}
         </div>
 
-        {/* Clean, Bold Dark Title */}
-        <h2 className="text-xl sm:text-[22px] font-bold tracking-tight leading-snug text-slate-900">
+        {/* Clean, Bold White Title matching Screenshot 2 */}
+        <h2 className="text-xl sm:text-[22px] font-bold tracking-tight leading-snug text-white">
           {toSentenceCase(title)}
         </h2>
       </div>
 
-      {/* Right Circular Icon Badge */}
-      <div className="w-14 h-14 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+      {/* Right Circular Neon Icon Badge matching Screenshot 2 */}
+      <div className="w-14 h-14 rounded-full border border-blue-400/40 bg-blue-900/40 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
         {renderHeroIcon()}
       </div>
     </div>
@@ -351,10 +352,10 @@ export const Row: React.FC<{
   }
 
   return (
-    <div className={`flex items-start gap-3.5 p-4 bg-white rounded-2xl border border-slate-200 max-w-[70ch] ${className}`}>
+    <div className={`flex items-start gap-3.5 p-4 bg-[#091326] rounded-2xl border border-blue-900/40 max-w-[70ch] ${className}`}>
       {badge}
       <div className="flex-1 min-w-0">
-        <span className="font-['Plus_Jakarta_Sans'] text-[13px] sm:text-sm font-semibold text-slate-800 leading-relaxed">
+        <span className="font-['Plus_Jakarta_Sans'] text-[13px] sm:text-sm font-semibold text-white/95 leading-relaxed">
           {toSentenceCase(children)}
         </span>
       </div>
@@ -368,10 +369,10 @@ export const Panel: React.FC<{
   className?: string;
 }> = ({ type = 'default', children, className = '' }) => {
   const bgStyles: Record<PanelType, string> = {
-    default: 'bg-white border border-slate-200 text-slate-800',
-    do: 'bg-emerald-50 border border-emerald-200 text-emerald-900',
-    dont: 'bg-rose-50 border border-rose-200 text-rose-900',
-    takeaway: 'bg-amber-50 border border-amber-200 text-amber-900',
+    default: 'bg-[#0c1a36] border border-blue-900/40 text-slate-100',
+    do: 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-100',
+    dont: 'bg-rose-950/70 border border-rose-500/60 text-rose-100',
+    takeaway: 'bg-amber-950/60 border border-amber-500/50 text-amber-100',
   };
 
   const resolvedBg = bgStyles[type] || bgStyles.default;
