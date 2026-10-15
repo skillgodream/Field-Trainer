@@ -2,6 +2,34 @@ import React, { useState } from 'react';
 import { Slide } from '../types';
 import { ArrowRight, Check, X, HelpCircle, AlertCircle } from 'lucide-react';
 
+/** Strips backend metadata, category badges, and description text from option cards */
+function cleanOptionText(rawText: string): string {
+  if (!rawText) return '';
+  let text = String(rawText).trim();
+
+  // 1. Take only the primary title if text contains line breaks
+  if (text.includes('\n')) {
+    text = text.split('\n')[0].trim();
+  }
+
+  // 2. Remove leading badges/tags like [ACCEPT / PASS], ACCEPT / PASS, etc.
+  text = text
+    .replace(/^\[?\s*(ACCEPT\s*\/\s*PASS|ACCEPT\s*\/\s*REJECT|DO\s*\/\s*DONT|MANDATORY|COMPLIANT|NON-COMPLIANT|PASSED|FAILED)\s*\]?:?\s*/i, '')
+    .trim();
+
+  // 3. Remove trailing backend rationale or failure mode descriptions starting after separators (—, |, -)
+  text = text
+    .replace(/\s*[—–|-]\s*(Compliant SOP|Failure mode|Safety\/compliance hazard|Operational rule|Rationale|SOP requirement|Violates).*$/i, '')
+    .trim();
+
+  // 4. Remove standalone backend phrases if present
+  text = text
+    .replace(/\s*(Compliant SOP standard procedure|Failure mode:.*|Safety\/compliance hazard:.*|Operational rule:.*)$/i, '')
+    .trim();
+
+  return text;
+}
+
 export const DecisionPage: React.FC<{
   slide: Slide;
   onChoiceSelect: (isCorrect: boolean, feedback: string) => void;
@@ -139,46 +167,43 @@ export const DecisionPage: React.FC<{
               <div
                 key={j}
                 onClick={() => handleSelect(j)}
-                className={`rounded-2xl p-4 transition-all duration-200 flex items-center gap-3.5 cursor-pointer ${cardStyle}`}
+                className={`group rounded-2xl p-4 transition-all duration-200 flex items-center gap-4 cursor-pointer select-none ${cardStyle}`}
               >
-                {/* Radio circle indicator on left */}
+                {/* Prominent Dot/Circle Radio Option Indicator */}
                 <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
                     isChecked
                       ? isThisCorrect
-                        ? 'border-emerald-400 bg-emerald-500/20'
+                        ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.3)]'
                         : isSelected
-                        ? 'border-rose-400 bg-rose-500/20'
-                        : 'border-slate-600'
+                        ? 'border-rose-400 bg-rose-500/20 shadow-[0_0_10px_rgba(251,113,133,0.3)]'
+                        : 'border-slate-600/60 bg-slate-900/40'
                       : isSelected
-                      ? 'border-sky-400 bg-sky-500/20'
-                      : 'border-slate-600'
+                      ? 'border-sky-400 bg-sky-500/20 shadow-[0_0_10px_rgba(56,189,248,0.35)] scale-105'
+                      : 'border-slate-500/60 bg-slate-900/40 group-hover:border-sky-400/80 group-hover:bg-sky-500/10'
                   }`}
                 >
                   {isChecked ? (
                     isThisCorrect ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                      <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-sm" />
                     ) : isSelected ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                      <div className="w-3 h-3 rounded-full bg-rose-400 shadow-sm" />
                     ) : null
                   ) : isSelected ? (
-                    <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                  ) : null}
+                    <div className="w-3 h-3 rounded-full bg-sky-400 shadow-sm" />
+                  ) : (
+                    <div className="w-2 h-2 rounded-full bg-transparent group-hover:bg-sky-400/40 transition-all" />
+                  )}
                 </div>
 
-                {/* Number Badge (1, 2, 3) */}
-                <div className="w-7 h-7 rounded-lg bg-[#0e234e] border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                  <span>{j + 1}</span>
-                </div>
-
-                {/* Option Text */}
-                <span className="text-sm sm:text-base font-semibold text-white/95 flex-1 text-left">
-                  {opt.text}
+                {/* Option Text (clean title only, no backend description/subtitle) */}
+                <span className="text-sm sm:text-base font-semibold text-white/95 flex-1 text-left leading-snug">
+                  {cleanOptionText(opt.text)}
                 </span>
 
                 {/* Evaluated Status Icon on right */}
                 {isChecked && (
-                  <div className="shrink-0">
+                  <div className="shrink-0 ml-1">
                     {isThisCorrect ? (
                       <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 flex items-center justify-center">
                         <Check className="w-3.5 h-3.5 stroke-[3]" />

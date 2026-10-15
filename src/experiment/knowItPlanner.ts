@@ -218,16 +218,25 @@ function scenarioSlides(step: KStep, seed: number, topic: string): Slide[] | nul
   if (q.length < 25 || /^how do you execute step/i.test(q)) return null;
   if (raw.length < 2 || raw.filter((c) => c.isCorrect).length !== 1) return null;
 
-  const base = raw.map((c, i) => ({
-    id: c.id || `c${i + 1}`,
-    text: clip(c.title || c.text, 120),
-    isCorrect: !!c.isCorrect,
-    feedback: c.subtitle
-      ? clip(c.subtitle, 160)
-      : c.isCorrect
-      ? 'Correct. This is what the SOP requires.'
-      : 'Not quite. This breaks the SOP.',
-  }));
+  const base = raw.map((c, i) => {
+    const rawTitle = String(c.title || c.text || '')
+      .replace(/^\[?\s*(ACCEPT\s*\/\s*PASS|ACCEPT\s*\/\s*REJECT|DO\s*\/\s*DONT|MANDATORY|COMPLIANT|NON-COMPLIANT|PASSED|FAILED)\s*\]?:?\s*/i, '')
+      .split('\n')[0]
+      .replace(/\s*[—–|-]\s*(Compliant SOP|Failure mode|Safety\/compliance hazard|Operational rule|Rationale|SOP requirement|Violates).*$/i, '')
+      .replace(/\s*(Compliant SOP standard procedure|Failure mode:.*|Safety\/compliance hazard:.*|Operational rule:.*)$/i, '')
+      .trim();
+
+    return {
+      id: c.id || `c${i + 1}`,
+      text: clip(rawTitle, 120),
+      isCorrect: !!c.isCorrect,
+      feedback: c.subtitle
+        ? clip(c.subtitle, 160)
+        : c.isCorrect
+        ? 'Correct. This is what the SOP requires.'
+        : 'Not quite. This breaks the SOP.',
+    };
+  });
 
   const choices = arrangeChoices(base, seed).map((c) => ({ ...c, why: c.feedback }));
 
