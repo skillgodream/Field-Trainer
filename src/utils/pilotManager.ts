@@ -166,7 +166,7 @@ export interface PilotScorecard {
 const LOCAL_STORAGE_KEY = 'guruji_pilot_learners_v2';
 
 // Seed Initial Representative Frontline Learner Data across domains
-const SEED_LEARNERS: PilotLearner[] = [
+export const SEED_LEARNERS: PilotLearner[] = [
   {
     id: 'learner-hsk-1',
     name: 'Aisha Sharma',
@@ -430,7 +430,12 @@ export function getStoredPilotLearners(): PilotLearner[] {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(SEED_LEARNERS));
       return SEED_LEARNERS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(SEED_LEARNERS));
+      return SEED_LEARNERS;
+    }
+    return parsed;
   } catch (e) {
     console.error('Failed to load pilot learners:', e);
     return SEED_LEARNERS;

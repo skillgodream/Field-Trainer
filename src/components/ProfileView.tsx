@@ -6,9 +6,11 @@ interface ProfileViewProps {
   onResetData: () => void;
   onOpenBentoShowcase?: () => void;
   onOpenPassport?: () => void;
+  onOpenRoleSwitcher?: () => void;
+  role?: string;
 }
 
-export default function ProfileView({ onResetData, onOpenBentoShowcase, onOpenPassport }: ProfileViewProps) {
+export default function ProfileView({ onResetData, onOpenBentoShowcase, onOpenPassport, onOpenRoleSwitcher, role }: ProfileViewProps) {
   const [audioEnabled, setAudioEnabled] = useState(sounds.isSoundEnabled());
   const [darkMode, setDarkMode] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -51,18 +53,34 @@ export default function ProfileView({ onResetData, onOpenBentoShowcase, onOpenPa
       </div>
 
       {/* User Card - Apple Translucent Dark Glass */}
-      <div className="bg-[#0E1017]/85 backdrop-blur-2xl rounded-3xl p-5 border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.6)] flex items-center gap-4 relative overflow-hidden">
+      <div className="bg-[#0E1017]/85 backdrop-blur-2xl rounded-3xl p-5 border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.6)] flex items-center justify-between gap-4 relative overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
-        <div className="w-16 h-16 rounded-full bg-white/10 text-white flex items-center justify-center font-bold text-2xl border border-white/20 shadow-md">
-          VS
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/10 text-white flex items-center justify-center font-bold text-2xl border border-white/20 shadow-md">
+            VS
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Vikram Sharma</h2>
+            <p className="text-xs font-semibold text-emerald-400">
+              {role === 'admin' ? 'System Administrator' : role === 'manager' ? 'Shift Operations Supervisor' : 'Frontline Learner'} · Bay A/B
+            </p>
+            <span className="text-[11px] font-normal text-white/50 block mt-0.5">
+              Badge ID: WMS-88492 · Shift 1
+            </span>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-white">Vikram Sharma</h2>
-          <p className="text-xs font-semibold text-emerald-400">Fulfillment Specialist · Bay A/B</p>
-          <span className="text-[11px] font-normal text-white/50 block mt-0.5">
-            Badge ID: WMS-88492 · Shift 1
-          </span>
-        </div>
+
+        {onOpenRoleSwitcher && (
+          <button
+            onClick={() => {
+              sounds.playTap();
+              onOpenRoleSwitcher();
+            }}
+            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-all cursor-pointer shrink-0"
+          >
+            Switch Role
+          </button>
+        )}
       </div>
 
       {/* Stats Summary - 3 Apple Translucent Cards */}

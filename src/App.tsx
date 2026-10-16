@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, Upload, BookOpen, Sparkles, ChevronRight, X } from 'lucide-react';
+import { Camera, Upload, BookOpen, Sparkles, ChevronRight, X, ShieldCheck, Users, GraduationCap } from 'lucide-react';
 import BottomNav from './components/BottomNav';
 import ScanModal from './components/ScanModal';
 import UploadModal from './components/UploadModal';
@@ -40,6 +40,9 @@ import { getApiHeaders } from './utils/apiHelper';
 import { ShowMeVideoModal } from './components/ShowMeVideoModal';
 import { SopGenerationModal } from './components/SopGenerationModal';
 import { AnalyzingModal } from './components/AnalyzingModal';
+import RoleNavigationModal, { UserRole } from './components/RoleNavigationModal';
+import ManagerDashboardView from './components/ManagerDashboardView';
+import AdminDashboardView from './components/AdminDashboardView';
 
 export default function App() {
   const [isDesignCheck, setIsDesignCheck] = useState<boolean>(
@@ -70,6 +73,12 @@ export default function App() {
   const [lessons, setLessons] = useState<Lesson[]>(INITIAL_LESSONS);
   const [showBentoShowcase, setShowBentoShowcase] = useState<boolean>(false);
   const [isSopOptionsOpen, setIsSopOptionsOpen] = useState<boolean>(false);
+
+  // Role & Permissions State: Learner · Manager · Admin (ID locking ready)
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>(() => {
+    return (localStorage.getItem('guruji_user_role') as UserRole) || 'learn';
+  });
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
 
   // Navigation & Flow State:
   const [isScanOpen, setIsScanOpen] = useState<boolean>(false);
@@ -448,27 +457,72 @@ export default function App() {
         <div className="absolute bottom-20 -left-20 w-[450px] h-[450px] rounded-full bg-slate-500/[0.03] blur-[130px]" />
       </div>
 
+
+
       {/* Main Tab Views & Bottom Navigation (only rendered when NOT in an active lesson, deck, or simulation) */}
       {!selectedLesson && !activeSimulator && !isIntroDeckOpen && (
         <>
           {activeTab === 'home' && (
-            <main className="flex-1 flex flex-col max-w-lg mx-auto w-full animate-in fade-in duration-200">
-              <MeetGurujiScreen
-                onContinue={() => {
-                  sounds.playTap();
-                  setIsSopOptionsOpen(true);
-                }}
-              />
+            <main className="flex-1 flex flex-col w-full animate-in fade-in duration-200">
+              {currentUserRole === 'admin' ? (
+                <div className="max-w-4xl mx-auto w-full">
+                  <AdminDashboardView
+                    lessons={lessons}
+                    onScanClick={() => setIsScanOpen(true)}
+                    onUploadClick={() => setIsUploadOpen(true)}
+                    onSelectSop={handleSelectSop}
+                    onDeleteSop={(id) => {
+                      fetch(`/api/repository/sops/${id}`, { method: 'DELETE' });
+                      setLessons((prev) => prev.filter((l) => l.id !== id));
+                    }}
+                    onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+                    onBackToHome={() => {
+                      sounds.playTap();
+                      setCurrentUserRole('learn');
+                      localStorage.setItem('guruji_user_role', 'learn');
+                      setActiveTab('home');
+                    }}
+                  />
+                </div>
+              ) : currentUserRole === 'manager' ? (
+                <div className="max-w-4xl mx-auto w-full">
+                  <ManagerDashboardView
+                    lessons={lessons}
+                    onSelectSop={handleSelectSop}
+                    onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+                    onBackToHome={() => {
+                      sounds.playTap();
+                      setCurrentUserRole('learn');
+                      localStorage.setItem('guruji_user_role', 'learn');
+                      setActiveTab('home');
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="max-w-lg mx-auto w-full">
+                  <MeetGurujiScreen
+                    onContinue={() => {
+                      sounds.playTap();
+                      setIsRoleModalOpen(true);
+                    }}
+                  />
+                </div>
+              )}
 
-              {/* Modern Ultra-Sleek Glass SOP Selection Drawer (Redesigned Modern UI) */}
+              {/* Modern Ultra-Sleek Glass SOP Selection Drawer (Role-Permission Aware) */}
               {isSopOptionsOpen && (
                 <div className="fixed inset-0 z-50 bg-[#070A14]/80 backdrop-blur-2xl flex items-end justify-center p-0 sm:p-4 animate-in fade-in duration-200">
                   <div className="w-full max-w-md bg-[#0D1226]/95 backdrop-blur-3xl border-t sm:border border-white/10 rounded-t-[36px] sm:rounded-[36px] p-6 shadow-[0_-20px_60px_rgba(0,0,0,0.7)] space-y-4 animate-in slide-in-from-bottom-8 duration-300 text-white">
-                    {/* Header: Clean & Minimal, No header badge icons or static text pills */}
+                    {/* Header */}
                     <div className="flex items-center justify-between pb-2">
-                      <h3 className="text-xl font-bold tracking-tight text-white">
-                        Choose SOP
-                      </h3>
+                      <div>
+                        <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-indigo-400 block">
+                          {currentUserRole === 'admin' ? 'Admin Master Mode' : currentUserRole === 'manager' ? 'Manager SOP Review' : 'Frontline Learning'}
+                        </span>
+                        <h3 className="text-xl font-bold tracking-tight text-white mt-0.5">
+                          {currentUserRole === 'admin' ? 'Manage SOPs' : 'Choose SOP'}
+                        </h3>
+                      </div>
                       <button
                         onClick={() => setIsSopOptionsOpen(false)}
                         className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 flex items-center justify-center transition-all cursor-pointer shrink-0"
@@ -478,7 +532,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Action Cards Grid: Visual, Non-Text-Heavy, Modern Layout */}
+                    {/* Action Cards Grid */}
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       {/* Option 1: Housekeeping Featured SOP */}
                       <button
@@ -495,7 +549,7 @@ export default function App() {
                           </div>
                           <div>
                             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                              Demo
+                              Verified SOP
                             </span>
                             <span className="text-sm font-bold text-white block leading-tight">
                               Room Sanitization
@@ -505,49 +559,70 @@ export default function App() {
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
                       </button>
 
-                      {/* Option 2: Scan SOP */}
-                      <button
-                        onClick={() => {
-                          sounds.playTap();
-                          setIsSopOptionsOpen(false);
-                          setIsScanOpen(true);
-                        }}
-                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
-                      >
-                        <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
-                          <Camera className="w-4 h-4" />
-                        </div>
-                        <div className="mt-2">
-                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
-                            Camera
-                          </span>
-                          <span className="text-sm font-bold text-white block leading-tight">
-                            Scan SOP
-                          </span>
-                        </div>
-                      </button>
+                      {/* Option 2 & 3: SCAN & UPLOAD (ONLY ADMIN HAS ACCESS) */}
+                      {currentUserRole === 'admin' ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              sounds.playTap();
+                              setIsSopOptionsOpen(false);
+                              setIsScanOpen(true);
+                            }}
+                            className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
+                              <Camera className="w-4 h-4 text-sky-400" />
+                            </div>
+                            <div className="mt-2">
+                              <span className="text-[10px] font-semibold text-emerald-400 block uppercase tracking-wider">
+                                Admin Scan
+                              </span>
+                              <span className="text-sm font-bold text-white block leading-tight">
+                                Scan SOP
+                              </span>
+                            </div>
+                          </button>
 
-                      {/* Option 3: Upload SOP */}
-                      <button
-                        onClick={() => {
-                          sounds.playTap();
-                          setIsSopOptionsOpen(false);
-                          setIsUploadOpen(true);
-                        }}
-                        className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
-                      >
-                        <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
-                          <Upload className="w-4 h-4" />
-                        </div>
-                        <div className="mt-2">
-                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">
-                            Document
+                          <button
+                            onClick={() => {
+                              sounds.playTap();
+                              setIsSopOptionsOpen(false);
+                              setIsUploadOpen(true);
+                            }}
+                            className="bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl p-4 backdrop-blur-md transition-all flex flex-col justify-between items-start group cursor-pointer text-left h-32"
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
+                              <Upload className="w-4 h-4 text-emerald-400" />
+                            </div>
+                            <div className="mt-2">
+                              <span className="text-[10px] font-semibold text-emerald-400 block uppercase tracking-wider">
+                                Admin Upload
+                              </span>
+                              <span className="text-sm font-bold text-white block leading-tight">
+                                Upload PDF
+                              </span>
+                            </div>
+                          </button>
+                        </>
+                      ) : (
+                        /* For Learner & Manager: show curriculum & practice shortcut */
+                        <div className="col-span-2 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-slate-300 flex items-center justify-between">
+                          <span>
+                            {currentUserRole === 'manager'
+                              ? 'Logged in as Manager: Assign SOPs & inspect scores in Manager Hub'
+                              : 'Logged in as Learner: Start drills & track your results'}
                           </span>
-                          <span className="text-sm font-bold text-white block leading-tight">
-                            Upload PDF
-                          </span>
+                          <button
+                            onClick={() => {
+                              setIsSopOptionsOpen(false);
+                              setIsRoleModalOpen(true);
+                            }}
+                            className="text-xs text-indigo-400 font-bold underline ml-2 shrink-0 cursor-pointer"
+                          >
+                            Switch
+                          </button>
                         </div>
-                      </button>
+                      )}
 
                       {/* Option 4: Browse Library */}
                       <button
@@ -559,7 +634,7 @@ export default function App() {
                         className="col-span-2 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer mt-1"
                       >
                         <BookOpen className="w-4 h-4 text-slate-300" />
-                        <span>Browse Library →</span>
+                        <span>{currentUserRole === 'admin' ? 'Manage SOP Repository →' : 'Browse My Learning →'}</span>
                       </button>
                     </div>
                   </div>
@@ -592,13 +667,45 @@ export default function App() {
           )}
 
           {activeTab === 'pilot' && (
-            <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full animate-in fade-in duration-200">
-              <PilotDashboardView
-                onBackToHome={() => setActiveTab('home')}
-                onSelectLearnerSop={(learner) => {
-                  handleSelectSop(learner.assignedSopId, learner.assignedSopTitle);
-                }}
-              />
+            <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full animate-in fade-in duration-200">
+              {currentUserRole === 'manager' ? (
+                <ManagerDashboardView
+                  lessons={lessons}
+                  onSelectSop={handleSelectSop}
+                  onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+                  onBackToHome={() => {
+                    sounds.playTap();
+                    setCurrentUserRole('learn');
+                    localStorage.setItem('guruji_user_role', 'learn');
+                    setActiveTab('home');
+                  }}
+                />
+              ) : currentUserRole === 'admin' ? (
+                <AdminDashboardView
+                  lessons={lessons}
+                  onScanClick={() => setIsScanOpen(true)}
+                  onUploadClick={() => setIsUploadOpen(true)}
+                  onSelectSop={handleSelectSop}
+                  onDeleteSop={(id) => {
+                    fetch(`/api/repository/sops/${id}`, { method: 'DELETE' });
+                    setLessons((prev) => prev.filter((l) => l.id !== id));
+                  }}
+                  onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+                  onBackToHome={() => {
+                    sounds.playTap();
+                    setCurrentUserRole('learn');
+                    localStorage.setItem('guruji_user_role', 'learn');
+                    setActiveTab('home');
+                  }}
+                />
+              ) : (
+                <PilotDashboardView
+                  onBackToHome={() => setActiveTab('home')}
+                  onSelectLearnerSop={(learner) => {
+                    handleSelectSop(learner.assignedSopId, learner.assignedSopTitle);
+                  }}
+                />
+              )}
             </main>
           )}
 
@@ -608,13 +715,20 @@ export default function App() {
                 onResetData={handleResetData}
                 onOpenBentoShowcase={() => setShowBentoShowcase(true)}
                 onOpenPassport={() => setIsPassportModalOpen(true)}
+                onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+                role={currentUserRole}
               />
             </main>
           )}
 
-          {/* Floating Bottom Navigation Bar (Hidden on Home tab) */}
-          {activeTab !== 'home' && (
-            <BottomNav activeTab={activeTab} onSelectTab={(tab) => setActiveTab(tab)} />
+          {/* Floating Bottom Navigation Bar (Hidden on Home tab in Learner mode, visible for Admin and Manager) */}
+          {(activeTab !== 'home' || currentUserRole !== 'learn') && (
+            <BottomNav
+              activeTab={activeTab}
+              onSelectTab={(tab) => setActiveTab(tab)}
+              role={currentUserRole}
+              onOpenRoleSwitcher={() => setIsRoleModalOpen(true)}
+            />
           )}
         </>
       )}
@@ -822,6 +936,22 @@ export default function App() {
            </button>
         </div>
       )}
+
+      {/* THE EXACT NAVIGATION: ROLE SELECTION MODAL */}
+      <RoleNavigationModal
+        isOpen={isRoleModalOpen}
+        activeRole={currentUserRole}
+        onSelectRole={(role) => {
+          setCurrentUserRole(role);
+          localStorage.setItem('guruji_user_role', role);
+          if (role === 'learn') {
+            setActiveTab('library');
+          } else {
+            setActiveTab('pilot');
+          }
+        }}
+        onClose={() => setIsRoleModalOpen(false)}
+      />
     </div>
   );
 }

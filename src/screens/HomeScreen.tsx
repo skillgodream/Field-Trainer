@@ -1,7 +1,8 @@
 import React from 'react';
-import { Upload, Camera, Sparkles, ArrowRight, ShieldCheck, FileText, Play } from 'lucide-react';
+import { Upload, Camera, Sparkles, ArrowRight, ShieldCheck, FileText, Play, BookOpen } from 'lucide-react';
 import { Lesson } from '../types';
 import { sounds } from '../utils/audio';
+import { UserRole } from '../components/RoleNavigationModal';
 
 interface HomeScreenProps {
   lessons: Lesson[];
@@ -10,6 +11,7 @@ interface HomeScreenProps {
   onSelectSop: (lessonId: string, title?: string) => void;
   onExploreLibrary: () => void;
   onOpenPassport: () => void;
+  userRole?: UserRole;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -19,6 +21,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onSelectSop,
   onExploreLibrary,
   onOpenPassport,
+  userRole = 'learn',
 }) => {
   return (
     <div className="flex-1 flex flex-col px-4 pt-4 pb-28 space-y-5 max-w-lg mx-auto w-full animate-in fade-in duration-200">
@@ -58,46 +61,77 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Strict Role Permissions */}
         <div className="w-full space-y-2.5 pt-2">
-          {/* Primary CTA: Upload SOP */}
-          <button
-            onClick={() => {
-              sounds.playTap();
-              onUploadClick();
-            }}
-            className="w-full h-12 rounded-2xl bg-white hover:bg-slate-100 active:scale-[0.98] text-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
-          >
-            <Upload size={18} className="text-black" />
-            <span>Upload SOP (PDF / DOCX)</span>
-          </button>
+          {userRole === 'admin' ? (
+            <>
+              {/* Primary CTA: Upload SOP (ADMIN ONLY) */}
+              <button
+                onClick={() => {
+                  sounds.playTap();
+                  onUploadClick();
+                }}
+                className="w-full h-12 rounded-2xl bg-white hover:bg-slate-100 active:scale-[0.98] text-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <Upload size={18} className="text-black" />
+                <span>Upload SOP (PDF / DOCX)</span>
+              </button>
 
-          {/* Secondary Actions Row */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={() => {
-                sounds.playTap();
-                if (lessons.length > 0) {
-                  onSelectSop(lessons[0].id, lessons[0].title);
-                }
-              }}
-              className="h-11 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Play size={15} className="text-emerald-400" />
-              <span>Try Demo SOP</span>
-            </button>
+              {/* Secondary Actions Row */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => {
+                    sounds.playTap();
+                    if (lessons.length > 0) {
+                      onSelectSop(lessons[0].id, lessons[0].title);
+                    }
+                  }}
+                  className="h-11 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Play size={15} className="text-emerald-400" />
+                  <span>Try Demo SOP</span>
+                </button>
 
-            <button
-              onClick={() => {
-                sounds.playTap();
-                onScanClick();
-              }}
-              className="h-11 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Camera size={15} className="text-sky-400" />
-              <span>Scan SOP</span>
-            </button>
-          </div>
+                <button
+                  onClick={() => {
+                    sounds.playTap();
+                    onScanClick();
+                  }}
+                  className="h-11 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Camera size={15} className="text-sky-400" />
+                  <span>Scan SOP</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Frontline Learner / Manager View: No Scan or Upload allowed */}
+              <button
+                onClick={() => {
+                  sounds.playTap();
+                  if (lessons.length > 0) {
+                    onSelectSop(lessons[0].id, lessons[0].title);
+                  }
+                }}
+                className="w-full h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 active:scale-[0.98] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+              >
+                <Play size={17} className="fill-current" />
+                <span>{userRole === 'manager' ? 'Review SOP Procedures' : 'Start SOP Training Drill'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  sounds.playTap();
+                  onExploreLibrary();
+                }}
+                className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <BookOpen size={15} className="text-indigo-400" />
+                <span>{userRole === 'manager' ? 'Browse SOPs to Assign' : 'Browse My Curriculum'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
