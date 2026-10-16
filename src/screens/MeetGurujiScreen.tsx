@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Target, Zap, TrendingUp, Star } from 'lucide-react';
-const gurujiImg = "/Coachguru.png";
+const gurujiImg = "/Vikram.png";
 
 interface MeetGurujiScreenProps {
   onContinue: () => void;
@@ -19,25 +19,30 @@ export const MeetGurujiScreen: React.FC<MeetGurujiScreenProps> = ({ onContinue }
         <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-[340px] h-[340px] rounded-full bg-white/[0.02] blur-[100px]" />
       </div>
 
-      {/* 2. Center Hero Koala Coach Visual with Rounded Dark Glass Card (matching Screenshot 2) */}
+      {/* 2. Center Hero Visual: Character on High-Transparency Translucent Apple Card */}
       <div className="relative z-10 my-auto flex flex-col items-center justify-center py-4 shrink-0">
-        <div className="relative w-76 h-76 sm:w-[380px] sm:h-[380px] flex items-center justify-center">
-          {/* Clean Rounded Dark Glass Card Contour */}
-          <div className="absolute inset-0 rounded-[44px] bg-white/[0.03] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl" />
+        <div className="relative w-80 h-80 sm:w-[390px] sm:h-[390px] flex items-center justify-center p-4">
+          {/* Apple Translucent Glass Card (High Transparency) */}
+          <div className="absolute inset-0 rounded-[44px] bg-white/[0.04] backdrop-blur-2xl border border-white/[0.12] shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden pointer-events-none">
+            {/* Top specular reflection shimmer edge */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+            {/* Soft subtle radial ambient sheen */}
+            <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/[0.03] blur-2xl" />
+          </div>
           
-          {/* 3D Koala Coach Avatar */}
+          {/* Transparent Avatar floating on the translucent card */}
           <motion.div
-            animate={{ y: [0, -8, 0] }}
+            animate={{ y: [0, -6, 0] }}
             transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-            className="relative z-10 w-full h-full flex items-center justify-center p-3 scale-110 sm:scale-120"
+            className="relative z-10 w-full h-full flex items-center justify-center p-2 scale-105 sm:scale-110"
           >
             <img
-              src="/Coachguru.png"
-              alt="Guruji Koala Coach"
+              src="/Vikram.png"
+              alt="Coach Guruji"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]"
+              className="w-full h-full object-contain filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.85)]"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = gurujiImg || "/guruji 1.png";
+                (e.target as HTMLImageElement).src = gurujiImg;
               }}
             />
           </motion.div>

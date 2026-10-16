@@ -1,5 +1,5 @@
 import React from 'react';
-const koalaImg = "/Coachguru.png";
+const coachImg = "/Vikram.png";
 
 interface ClayArtProps {
   type: 'scanner' | 'tote' | 'box' | 'safety' | 'clipboard' | 'trolley' | 'medal' | 'guru' | 'printer' | 'tape';
@@ -199,11 +199,11 @@ export default function ClayArt({ type, size = 120, className = '' }: ClayArtPro
       return (
         <div className={`relative flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
           <img
-            src="/Coachguru.png"
-            alt="Coach Guru Home Page Character"
+            src="/Vikram.png"
+            alt="Coach Guru"
             className="w-full h-full object-contain filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.18)]"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = koalaImg;
+              (e.target as HTMLImageElement).src = coachImg;
             }}
           />
         </div>

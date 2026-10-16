@@ -242,15 +242,15 @@ export default function LessonOverview({
             </p>
           </div>
 
-          {/* Right-side Koala Coach circular profile */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#161C2C] border border-white/15 flex items-center justify-center shrink-0 overflow-hidden shadow-2xl">
+          {/* Right-side Coach profile (No background container) */}
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center shrink-0">
             <img
-              src="/Coachguru.png"
-              alt="Guruji Koala Coach"
+              src="/Vikram.png"
+              alt="Coach Guruji"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain transform translate-y-2 scale-110 drop-shadow-md"
+              className="w-full h-full object-contain transform scale-105 drop-shadow-md"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "/guruji 1.png";
+                (e.target as HTMLImageElement).src = "/Vikram.png";
               }}
             />
           </div>

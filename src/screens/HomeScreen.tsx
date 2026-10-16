@@ -36,11 +36,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="relative w-28 h-28 shrink-0 flex items-center justify-center pt-2">
           <div className="absolute inset-0 rounded-full bg-emerald-500/10 blur-xl animate-pulse" />
           <img
-            src="/Coachguru.png"
-            alt="Guruji AI Trainer"
+            src="/Vikram.png"
+            alt="Guruji Coach"
             className="w-full h-full object-contain relative z-10 drop-shadow-xl"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = "/guruji 1.png";
+              (e.target as HTMLImageElement).src = "/Vikram.png";
             }}
           />
         </div>
