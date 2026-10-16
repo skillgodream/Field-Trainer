@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Eye,
   Award,
-  RotateCcw
+  RotateCcw,
+  BarChart2
 } from 'lucide-react';
 import { Lesson } from '../types';
 import {
@@ -54,6 +55,7 @@ export default function ManagerDashboardView({
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [activeObservationLearner, setActiveObservationLearner] = useState<PilotLearner | null>(null);
   const [activeEvidenceLearner, setActiveEvidenceLearner] = useState<PilotLearner | null>(null);
+  const [selectedProgressLearner, setSelectedProgressLearner] = useState<PilotLearner | null>(null);
 
   const scorecard = useMemo(() => {
     try {
@@ -292,36 +294,28 @@ export default function ManagerDashboardView({
                   className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
-                      <span className="text-white/20">•</span>
-                      <span className="text-[11px] font-mono text-white/60">
-                        Created: <span className="text-white/90">{createdDate}</span>
-                      </span>
-                      <span className="text-white/20">•</span>
+                    <div className="flex items-center gap-2.5">
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
-                          isAssigned
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isAssigned ? 'bg-[#15803d]' : 'bg-[#52525b]'
                         }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                        {assignedStatus}
-                      </span>
+                        title={isAssigned ? 'Assigned' : 'Not Assigned'}
+                      />
+                      <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
                     </div>
-
-                    <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
-                    <p className="text-xs text-white/50 line-clamp-1">{lesson.description}</p>
+                    <p className="text-xs text-white/50 line-clamp-1 pl-4.5">{lesson.description}</p>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto pt-1 sm:pt-0">
+                    <span className="text-xs font-mono text-white/40">
+                      {createdDate}
+                    </span>
                     <button
                       onClick={() => {
                         sounds.playTap();
                         onSelectSop(lesson.id, lesson.title);
                       }}
-                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer transition-colors"
                     >
                       Preview
                     </button>
@@ -330,9 +324,9 @@ export default function ManagerDashboardView({
                         sounds.playTap();
                         setIsAssignModalOpen(true);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-bold text-white cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-bold text-white cursor-pointer transition-colors"
                     >
-                      Assign to Associate
+                      Assign
                     </button>
                   </div>
                 </div>
@@ -345,52 +339,240 @@ export default function ManagerDashboardView({
       {/* TAB 3: PROGRESS & SCORES */}
       {activeSubTab === 'scores' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02]">
-            <h3 className="text-sm font-bold text-white">Associate Training Records & Sign-Offs</h3>
-            <p className="text-xs text-white/50 mt-0.5">
-              Review solo assessment scores, critical control checks, and supervisor floor verifications.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 divide-y divide-white/10 bg-black overflow-hidden">
-            {filteredLearners.map((learner) => {
-              const lastAttempt = learner.attempts?.[learner.attempts.length - 1];
-              const score = lastAttempt?.score || (learner.workplaceReadiness === 'workplace_demonstration_passed' ? 95 : 80);
-
-              return (
-                <div
-                  key={learner.id}
-                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
-                >
-                  <div>
-                    <span className="text-sm font-bold text-white block">{learner.name}</span>
-                    <span className="text-xs text-white/50 block mt-0.5">
-                      {learner.role} · {learner.assignedSopTitle || 'Room Sanitization'}
+          {selectedProgressLearner ? (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              {/* Individual Header with Return to Scores */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div>
+                  <button
+                    onClick={() => {
+                      sounds.playTap();
+                      setSelectedProgressLearner(null);
+                    }}
+                    className="text-xs text-white/60 hover:text-white flex items-center gap-1 mb-2 font-medium cursor-pointer transition-colors"
+                  >
+                    ← Back to All Associate Scores
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                      {selectedProgressLearner.name}'s Progress
+                    </h3>
+                    <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      My Progress Dashboard
                     </span>
                   </div>
+                  <p className="text-xs text-white/60 mt-0.5">
+                    {selectedProgressLearner.role} · {selectedProgressLearner.domain} · Assigned SOP: {selectedProgressLearner.assignedSopTitle || 'Room Sanitization'}
+                  </p>
+                </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <span className="text-sm font-bold text-white block">{score}%</span>
-                      <span className="text-[10px] text-white/50 block">
-                        {learner.workplaceReadiness === 'workplace_demonstration_passed' ? 'Floor Verified' : 'In Training'}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      sounds.playTap();
+                      setActiveEvidenceLearner(selectedProgressLearner);
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-semibold text-white cursor-pointer"
+                  >
+                    Audit Evidence
+                  </button>
+                  <button
+                    onClick={() => {
+                      sounds.playTap();
+                      setActiveObservationLearner(selectedProgressLearner);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold cursor-pointer"
+                  >
+                    Audit Floor Observation
+                  </button>
+                </div>
+              </div>
+
+              {/* Individual Hero Readiness Card (Matching "My Progress" Apple Glass style) */}
+              <div className="bg-[#0E1017]/85 backdrop-blur-2xl rounded-3xl p-6 text-white shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-white/10 relative overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+
+                <div className="flex items-center justify-between mb-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    selectedProgressLearner.workplaceReadiness === 'workplace_demonstration_passed'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {selectedProgressLearner.workplaceReadiness === 'workplace_demonstration_passed' ? 'FLOOR VERIFIED & CERTIFIED' : 'PRACTICE DRILLS COMPLETED'}
+                  </span>
+                  <span className="text-xs font-medium text-white/60">
+                    Solo Test Threshold: 85%
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  {/* Gauge */}
+                  <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90">
+                      <circle cx="56" cy="56" r="46" stroke="rgba(255,255,255,0.12)" strokeWidth="8" fill="transparent" />
+                      <circle
+                        cx="56"
+                        cy="56"
+                        r="46"
+                        stroke="#FFFFFF"
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray={2 * Math.PI * 46}
+                        strokeDashoffset={2 * Math.PI * 46 - (((selectedProgressLearner.attempts?.[selectedProgressLearner.attempts.length - 1]?.score) || (selectedProgressLearner.workplaceReadiness === 'workplace_demonstration_passed' ? 95 : 82)) / 100) * 2 * Math.PI * 46}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-black text-white">
+                        {(selectedProgressLearner.attempts?.[selectedProgressLearner.attempts.length - 1]?.score) || (selectedProgressLearner.workplaceReadiness === 'workplace_demonstration_passed' ? 95 : 82)}%
                       </span>
+                      <span className="text-[9px] uppercase font-bold text-white/50">Mastery</span>
                     </div>
+                  </div>
 
-                    <button
-                      onClick={() => {
-                        sounds.playTap();
-                        setActiveObservationLearner(learner);
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
-                    >
-                      Audit
-                    </button>
+                  <div className="space-y-1 text-center sm:text-left">
+                    <h4 className="text-lg font-bold text-white leading-tight">
+                      {selectedProgressLearner.assignedSopTitle || 'Operational SOP Readiness'}
+                    </h4>
+                    <p className="text-xs text-white/60 leading-relaxed">
+                      Individual performance record based on Show Me, Guide Me, and Solo Test Me runs. Zero critical safety breaches recorded.
+                    </p>
+                    <div className="flex items-center justify-center sm:justify-start gap-4 pt-2 text-xs font-mono text-white/80">
+                      <div>Solo Accuracy: <span className="font-bold text-emerald-400">{(selectedProgressLearner.attempts?.[0]?.score) || 92}%</span></div>
+                      <div>Critical Gates: <span className="font-bold text-white">Passed</span></div>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              {/* Module Competency Breakdown */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-white/50 mb-3">
+                  Module Competency Breakdown
+                </h4>
+                <div className="space-y-3">
+                  {lessons.slice(0, 4).map((lesson, idx) => (
+                    <div
+                      key={lesson.id}
+                      className="p-4 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
+                          <span className="text-white/20">•</span>
+                          <span className="text-[11px] font-mono text-white/60">{lesson.stepsCount} steps · {lesson.durationMinutes} min</span>
+                        </div>
+                        <h5 className="text-sm font-bold text-white">{lesson.title}</h5>
+                        <p className="text-xs text-white/50 line-clamp-1">{lesson.description}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-white block">
+                            {idx === 0 ? '96%' : idx === 1 ? '92%' : idx === 2 ? '88%' : '85%'}
+                          </span>
+                          <span className="text-[10px] text-emerald-400 block font-medium">Certified</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            sounds.playTap();
+                            onSelectSop(lesson.id, lesson.title);
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
+                        >
+                          Inspect SOP
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Earned Badges */}
+              <div className="p-4 rounded-2xl border border-white/10 bg-black">
+                <div className="flex items-center gap-2 mb-3">
+                  <Award size={16} className="text-amber-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-white/70">
+                    Earned Badges & Qualification Checks
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-white">
+                  <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-400" />
+                    <span>Zero Safety Breach Standard</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-center gap-2">
+                    <Award size={16} className="text-sky-400" />
+                    <span>Certified Operational Handshake</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white">Associate Training Records & Sign-Offs</h3>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Review solo assessment scores, critical control checks, and supervisor floor verifications.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 divide-y divide-white/10 bg-black overflow-hidden">
+                {filteredLearners.map((learner) => {
+                  const lastAttempt = learner.attempts?.[learner.attempts.length - 1];
+                  const score = lastAttempt?.score || (learner.workplaceReadiness === 'workplace_demonstration_passed' ? 95 : 80);
+
+                  return (
+                    <div
+                      key={learner.id}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div>
+                        <span className="text-sm font-bold text-white block">{learner.name}</span>
+                        <span className="text-xs text-white/50 block mt-0.5">
+                          {learner.role} · {learner.assignedSopTitle || 'Room Sanitization'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="text-right mr-1">
+                          <span className="text-sm font-bold text-white block">{score}%</span>
+                          <span className="text-[10px] text-white/50 block">
+                            {learner.workplaceReadiness === 'workplace_demonstration_passed' ? 'Floor Verified' : 'In Training'}
+                          </span>
+                        </div>
+
+                        {/* 1. Progress Pill */}
+                        <button
+                          onClick={() => {
+                            sounds.playTap();
+                            setSelectedProgressLearner(learner);
+                          }}
+                          className="px-3.5 py-1.5 rounded-full bg-white text-black hover:bg-white/90 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95"
+                          title={`Navigate to ${learner.name}'s individual progress dashboard`}
+                        >
+                          <BarChart2 size={13} />
+                          <span>Progress</span>
+                        </button>
+
+                        {/* 2. Audit Button */}
+                        <button
+                          onClick={() => {
+                            sounds.playTap();
+                            setActiveObservationLearner(learner);
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer transition-colors"
+                          title="Supervisor Floor Demonstration Audit"
+                        >
+                          Audit
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 

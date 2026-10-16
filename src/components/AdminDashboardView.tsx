@@ -293,54 +293,51 @@ export default function AdminDashboardView({
                   className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
-                      <span className="text-white/20">•</span>
-                      <span className="text-[11px] font-mono text-white/60">
-                        Created: <span className="text-white/90">{createdDate}</span>
-                      </span>
-                      <span className="text-white/20">•</span>
+                    <div className="flex items-center gap-2.5">
+                      {/* Very small dot: subtle natural forest green if assigned (no neon), neutral grey if not assigned */}
                       <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
-                          isAssigned
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isAssigned ? 'bg-[#15803d]' : 'bg-[#52525b]'
                         }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                        {assignedStatus}
-                      </span>
+                        title={isAssigned ? 'Assigned' : 'Not Assigned'}
+                      />
+                      <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
                     </div>
-
-                    <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
-                    <p className="text-xs text-white/50 line-clamp-1">{lesson.description}</p>
+                    <p className="text-xs text-white/50 line-clamp-1 pl-4.5">{lesson.description}</p>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto pt-1 sm:pt-0">
                     <button
                       onClick={() => {
                         sounds.playTap();
                         onSelectSop(lesson.id, lesson.title);
                       }}
-                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer transition-colors"
                     >
                       Inspect
                     </button>
 
-                    {onDeleteSop && (
-                      <button
-                        onClick={() => {
-                          sounds.playTap();
-                          if (confirm(`Delete '${lesson.title}' from the repository?`)) {
-                            onDeleteSop(lesson.id);
-                          }
-                        }}
-                        className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
-                        title="Delete SOP"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
+                    {/* Date placed right near the delete icon */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-white/40">
+                        {createdDate}
+                      </span>
+
+                      {onDeleteSop && (
+                        <button
+                          onClick={() => {
+                            sounds.playTap();
+                            if (confirm(`Delete '${lesson.title}' from the repository?`)) {
+                              onDeleteSop(lesson.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                          title="Delete SOP"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
