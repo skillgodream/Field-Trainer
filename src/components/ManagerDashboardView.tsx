@@ -25,6 +25,7 @@ import {
 import NewLearnerAssignmentModal from './NewLearnerAssignmentModal';
 import SupervisorObservationModal from './SupervisorObservationModal';
 import LearnerEvidenceReportModal from './LearnerEvidenceReportModal';
+import { getModuleCreationDate, getModuleAssignedStatus } from './AdminDashboardView';
 import { sounds } from '../utils/audio';
 
 interface ManagerDashboardViewProps {
@@ -84,7 +85,7 @@ export default function ManagerDashboardView({
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto px-4 sm:px-6 pt-4 pb-32 text-white relative z-10 w-full max-w-4xl mx-auto space-y-5 font-sans select-none animate-in fade-in duration-150">
+    <div className="flex-1 flex flex-col overflow-y-auto px-4 sm:px-6 pt-4 pb-16 text-white relative z-10 w-full max-w-4xl mx-auto space-y-5 font-sans select-none animate-in fade-in duration-150">
       
       {/* 1. Header (Clean, Flat, No Neon) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
@@ -280,39 +281,63 @@ export default function ManagerDashboardView({
           </div>
 
           <div className="rounded-2xl border border-white/10 divide-y divide-white/10 bg-black overflow-hidden">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
-              >
-                <div>
-                  <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
-                  <h4 className="text-sm font-bold text-white leading-snug">{lesson.title}</h4>
-                  <p className="text-xs text-white/50 mt-0.5 line-clamp-1">{lesson.description}</p>
-                </div>
+            {lessons.map((lesson, idx) => {
+              const createdDate = getModuleCreationDate(lesson, idx);
+              const assignedStatus = getModuleAssignedStatus(lesson, []);
+              const isAssigned = assignedStatus === 'Assigned';
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      sounds.playTap();
-                      onSelectSop(lesson.id, lesson.title);
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => {
-                      sounds.playTap();
-                      setIsAssignModalOpen(true);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-bold text-white cursor-pointer"
-                  >
-                    Assign to Associate
-                  </button>
+              return (
+                <div
+                  key={lesson.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
+                      <span className="text-white/20">•</span>
+                      <span className="text-[11px] font-mono text-white/60">
+                        Created: <span className="text-white/90">{createdDate}</span>
+                      </span>
+                      <span className="text-white/20">•</span>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
+                          isAssigned
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                        {assignedStatus}
+                      </span>
+                    </div>
+
+                    <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
+                    <p className="text-xs text-white/50 line-clamp-1">{lesson.description}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        sounds.playTap();
+                        onSelectSop(lesson.id, lesson.title);
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => {
+                        sounds.playTap();
+                        setIsAssignModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-bold text-white cursor-pointer"
+                    >
+                      Assign to Associate
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

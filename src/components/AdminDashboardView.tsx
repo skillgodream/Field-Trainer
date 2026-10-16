@@ -48,6 +48,31 @@ const INITIAL_CAMPAIGNS = [
   { id: 'c3', title: 'ESD Assembly Line Re-Certification', sop: 'Precision Mechanical Assembly', target: 'Assembly Technicians (32 Staff)', completion: 100 },
 ];
 
+export const getModuleCreationDate = (lesson: Lesson, index: number): string => {
+  if (lesson.createdAt) return lesson.createdAt;
+  const seedDates = [
+    'Oct 14, 2026',
+    'Oct 12, 2026',
+    'Oct 09, 2026',
+    'Oct 05, 2026',
+    'Sep 28, 2026',
+    'Sep 20, 2026',
+    'Sep 15, 2026',
+  ];
+  return seedDates[index % seedDates.length];
+};
+
+export const getModuleAssignedStatus = (lesson: Lesson, campaigns: any[]): 'Assigned' | 'Not Assigned' => {
+  if (lesson.assignedStatus) return lesson.assignedStatus;
+  if (lesson.isAssigned !== undefined) return lesson.isAssigned ? 'Assigned' : 'Not Assigned';
+  const assignedInCampaign = campaigns.some((c) =>
+    (c.sop && lesson.title && c.sop.toLowerCase().includes(lesson.title.toLowerCase())) ||
+    (c.sop && lesson.title && lesson.title.toLowerCase().includes(c.sop.toLowerCase()))
+  );
+  const isAssignedCommon = ['housekeeping_sanitization', 'picking-101', 'safety-first'].includes(lesson.id);
+  return assignedInCampaign || isAssignedCommon ? 'Assigned' : 'Not Assigned';
+};
+
 export default function AdminDashboardView({
   lessons,
   onScanClick,
@@ -144,7 +169,7 @@ export default function AdminDashboardView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto px-4 sm:px-6 pt-4 pb-32 text-white relative z-10 w-full max-w-4xl mx-auto space-y-5 font-sans select-none animate-in fade-in duration-150">
+    <div className="flex-1 flex flex-col overflow-y-auto px-4 sm:px-6 pt-4 pb-16 text-white relative z-10 w-full max-w-4xl mx-auto space-y-5 font-sans select-none animate-in fade-in duration-150">
       
       {/* 1. Header (Clean, Flat, No Neon) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
@@ -160,51 +185,38 @@ export default function AdminDashboardView({
               ← Back to Frontline (Guruji)
             </button>
           )}
-          <span className="text-[11px] font-mono font-semibold tracking-wider text-white/50 uppercase">
-            Admin Workspace
-          </span>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
             Administration Control Center
           </h1>
-          <p className="text-xs text-white/60 mt-0.5">
+          <p className="text-xs text-white/70 font-medium mt-0.5">
             Users · Content · Assignments · Reports · Settings
           </p>
         </div>
-
-        <button
-          onClick={() => {
-            sounds.playTap();
-            onOpenRoleSwitcher();
-          }}
-          className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-semibold text-xs transition-all cursor-pointer self-start sm:self-auto"
-        >
-          Switch Role
-        </button>
       </div>
 
-      {/* 2. PILLAR 1: Scan & Upload Authority (Clean Flat Bar, No Card Nesting, No Neon) */}
-      <div className="rounded-2xl border border-white/15 bg-black p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* 2. PILLAR 1: Scan & Upload Authority */}
+      <div className="rounded-2xl border border-white/15 bg-black p-5 flex flex-col items-center justify-center text-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-white">Scan & Upload Authority</span>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-base font-bold text-sky-400">Scan & Upload Authority</span>
             <span className="text-[10px] font-mono text-white/60 bg-white/10 px-2 py-0.5 rounded">
               Admin Exclusive
             </span>
           </div>
-          <p className="text-xs text-white/50 mt-0.5">
+          <p className="text-xs text-white/50 mt-1 max-w-md mx-auto">
             Sole authority to scan SOPs with camera OCR, upload document files, and create training decks.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-center gap-3 w-full max-w-md">
           <button
             onClick={() => {
               sounds.playTap();
               onScanClick();
             }}
-            className="px-3.5 py-2 rounded-xl border border-white/15 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+            className="flex-1 py-3 px-5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Camera size={14} />
+            <Camera size={18} className="text-sky-400" />
             <span>Scan SOP</span>
           </button>
 
@@ -213,19 +225,19 @@ export default function AdminDashboardView({
               sounds.playTap();
               onUploadClick();
             }}
-            className="px-3.5 py-2 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            className="flex-1 py-3 px-5 rounded-xl bg-white text-black hover:bg-white/90 text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Upload size={14} />
+            <Upload size={18} />
             <span>Upload SOP</span>
           </button>
         </div>
       </div>
 
-      {/* 3. Flat Tab Selector (Matching exact minimalist screenshot layout) */}
+      {/* 3. Flat Tab Selector with Mustard Pill Text */}
       <div className="grid grid-cols-5 gap-1 bg-black p-1 rounded-xl border border-white/10">
         {[
-          { id: 'content', label: `Content (${lessons.length})` },
-          { id: 'users', label: `Users (${userList.length})` },
+          { id: 'content', label: 'Content' },
+          { id: 'users', label: 'Users' },
           { id: 'assignments', label: 'Assignments' },
           { id: 'reports', label: 'Reports' },
           { id: 'settings', label: 'Settings' },
@@ -238,10 +250,10 @@ export default function AdminDashboardView({
                 sounds.playTap();
                 setActiveTab(tab.id as any);
               }}
-              className={`py-2 px-2 sm:px-3 rounded-lg text-xs font-semibold text-center transition-all cursor-pointer truncate ${
+              className={`py-2 px-1 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold text-center transition-all cursor-pointer truncate ${
                 isActive
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-white/50 hover:text-white/80'
+                  ? 'bg-white/15 text-[#E5A93C] shadow-sm font-bold'
+                  : 'text-[#E5A93C]/60 hover:text-[#E5A93C]'
               }`}
             >
               {tab.label}
@@ -270,45 +282,69 @@ export default function AdminDashboardView({
           </div>
 
           <div className="rounded-2xl border border-white/10 divide-y divide-white/10 bg-black overflow-hidden">
-            {filteredLessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
-              >
-                <div>
-                  <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
-                  <h4 className="text-sm font-bold text-white leading-snug">{lesson.title}</h4>
-                  <p className="text-xs text-white/50 mt-0.5 line-clamp-1">{lesson.description}</p>
-                </div>
+            {filteredLessons.map((lesson, idx) => {
+              const createdDate = getModuleCreationDate(lesson, idx);
+              const assignedStatus = getModuleAssignedStatus(lesson, campaigns);
+              const isAssigned = assignedStatus === 'Assigned';
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      sounds.playTap();
-                      onSelectSop(lesson.id, lesson.title);
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
-                  >
-                    Inspect
-                  </button>
+              return (
+                <div
+                  key={lesson.id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-semibold text-white/50 uppercase">{lesson.category}</span>
+                      <span className="text-white/20">•</span>
+                      <span className="text-[11px] font-mono text-white/60">
+                        Created: <span className="text-white/90">{createdDate}</span>
+                      </span>
+                      <span className="text-white/20">•</span>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
+                          isAssigned
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-zinc-800/80 text-zinc-400 border border-zinc-700/50'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                        {assignedStatus}
+                      </span>
+                    </div>
 
-                  {onDeleteSop && (
+                    <h4 className="text-base sm:text-lg font-bold text-white leading-snug">{lesson.title}</h4>
+                    <p className="text-xs text-white/50 line-clamp-1">{lesson.description}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => {
                         sounds.playTap();
-                        if (confirm(`Delete '${lesson.title}' from the repository?`)) {
-                          onDeleteSop(lesson.id);
-                        }
+                        onSelectSop(lesson.id, lesson.title);
                       }}
-                      className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
-                      title="Delete SOP"
+                      className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-xs font-semibold text-white/80 cursor-pointer"
                     >
-                      <Trash2 size={13} />
+                      Inspect
                     </button>
-                  )}
+
+                    {onDeleteSop && (
+                      <button
+                        onClick={() => {
+                          sounds.playTap();
+                          if (confirm(`Delete '${lesson.title}' from the repository?`)) {
+                            onDeleteSop(lesson.id);
+                          }
+                        }}
+                        className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                        title="Delete SOP"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

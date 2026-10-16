@@ -224,6 +224,9 @@ export interface Lesson {
   trainingPlan?: TrainingPlanItem[];
   stepObjects?: StepObject[];
   videoPlan?: VideoDemonstrationPlan;
+  createdAt?: string;
+  isAssigned?: boolean;
+  assignedStatus?: 'Assigned' | 'Not Assigned';
 }
 
 export interface ToolItem {

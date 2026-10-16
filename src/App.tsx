@@ -721,8 +721,8 @@ export default function App() {
             </main>
           )}
 
-          {/* Floating Bottom Navigation Bar (Hidden on Home tab in Learner mode, visible for Admin and Manager) */}
-          {(activeTab !== 'home' || currentUserRole !== 'learn') && (
+          {/* Floating Bottom Navigation Bar (Only for frontline User/Learner, hidden in Admin and Manager workspaces) */}
+          {currentUserRole === 'learn' && activeTab !== 'home' && (
             <BottomNav
               activeTab={activeTab}
               onSelectTab={(tab) => setActiveTab(tab)}
