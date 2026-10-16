@@ -48,12 +48,24 @@ const METADATA_PATTERNS = [
   /process name:/i,
   /operating procedure/i,
   /primary school teacher/i,
+  /controlled copy/i,
+  /ret-pu-sop/i,
+  /review cycle/i,
+  /applies to return/i,
+  /\|\s*page\s*\d+/i,
+  /page\s*\d+\s*of\s*\d+/i,
+  /confidential/i,
+  /for internal use only/i,
 ];
 
 function isOperationalContent(line: string, filename?: string): boolean {
   const trimmed = line.trim();
   if (trimmed.length < 10) return false;
   if (METADATA_PATTERNS.some((p) => p.test(trimmed))) return false;
+  // Filter running document headers like "RET-PU-SOP-001 | Controlled copy when approved Page 1"
+  if (/\|.*controlled copy/i.test(trimmed) || /controlled copy.*\|/i.test(trimmed)) return false;
+  if (/\|\s*page\s*\d+/i.test(trimmed)) return false;
+  if (/^[a-z0-9_-]+\s*\|\s*.*page\s*\d+/i.test(trimmed)) return false;
   if (filename) {
     const cleanFilename = filename.replace(/\.(txt|pdf|docx)$/i, '').toLowerCase();
     if (trimmed.toLowerCase().includes(cleanFilename) || cleanFilename.includes(trimmed.toLowerCase())) {
@@ -433,7 +445,7 @@ export function buildOperationalBlueprintFromKnowledgeModel(km: SopKnowledgeMode
       category,
       action_verb,
       critical_control: textLower.includes('must') || textLower.includes('never') || textLower.includes('verify'),
-      why_it_matters: `SOP Requirement: ${s.sourceEvidence}`,
+      why_it_matters: s.sourceEvidence || s.action,
       source: {
         page_or_section: s.pageOrSection,
         source_ref: s.sourceRef,
@@ -565,8 +577,16 @@ export function toActionableHeadline(str: string, defaultTopic: string = 'Execut
   if (!str) return defaultTopic;
 
   let clean = str.trim()
+    .replace(/(?:sop requirement|mandatory rule|operational rule):\s*/gi, '')
+    .replace(/\|\s*controlled copy[^\n]*/gi, '')
+    .replace(/controlled copy[^\n]*/gi, '')
+    .replace(/ret-pu-sop-[a-z0-9_-]+/gi, '')
+    .replace(/\|\s*page\s*\d+[^\n]*/gi, '')
+    .replace(/\bpage\s*\d+\b/gi, '')
     .replace(/^[\d\.\-\*\•\:]\s*/, '')
-    .replace(/^(please|ensure|always|must|should|verify that|make sure to)\s+/i, '');
+    .replace(/^(please|ensure|always|must|should|verify that|make sure to)\s+/i, '')
+    .replace(/\s*\|\s*/g, ' — ')
+    .trim();
 
   if (clean.length > 0) {
     clean = clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -622,7 +642,8 @@ function createScenarioQuestionFromStep(
 
   let title = toActionableHeadline(instruction, `Execute Step ${index + 1}`);
   let question = `When performing ${process}, how do you execute this step correctly?`;
-  let choiceCorrect = cleanInstruction;
+  const firstSentence = (cleanInstruction.split(/[.|;\n]/)[0] || cleanInstruction).trim();
+  let choiceCorrect = `DO: ${toActionTitle(firstSentence, 10)}. NEVER: Bypass verification without lead sign-off.`;
   let choiceDistractor1 = `Skip mandatory verification check to complete task faster`;
   let choiceDistractor2 = `Improvise an unapproved workaround when encountering anomalies`;
 
@@ -742,12 +763,12 @@ export function consolidateToMacroCards(orderedSteps: any[], maxCards: number = 
     const aggregatedSource = {
       page_or_section: pages.length > 0 ? pages.join(', ') : (primaryStep.source?.page_or_section || 'Page 1'),
       source_ref: refs.length > 0 ? refs.join(', ') : (primaryStep.source?.source_ref || 'S1.sec1'),
-      source_text: group.map((s) => s.source?.source_text || s.instruction).join(' | '),
+      source_text: primaryStep.source?.source_text || primaryStep.instruction,
     };
 
     const isCritical = group.some((s) => s.critical_control);
-    const whyCombined = group.map((s) => s.why_it_matters).filter(Boolean).join(' ') || primaryStep.why_it_matters;
-    const coachTips = group.map((s) => s.coach_tip).filter(Boolean).join(' ') || primaryStep.coach_tip;
+    const whyCombined = primaryStep.why_it_matters || 'Crucial for upholding standard quality and safety compliance.';
+    const coachTips = primaryStep.coach_tip || `Always verify required criteria before proceeding.`;
 
     return {
       ...primaryStep,
@@ -881,8 +902,8 @@ export function generateLessonFromOperationalBlueprint(
       sku: item.target_code || '',
       priority: item.critical_control ? 'High Priority' : 'Standard',
       choices,
-      why: item.why_it_matters || `SOP Requirement: ${item.source?.source_text || item.instruction}`,
-      coachTip: item.coach_tip || `Operational Rule: ${item.instruction}`,
+      why: item.why_it_matters || (item.source?.source_text ? toActionableHeadline(item.source.source_text) : 'Crucial for upholding standard quality and safety compliance.'),
+      coachTip: item.coach_tip || `Adhere strictly: ${toActionableHeadline(item.instruction)}`,
       hint: item.hint || `Refer to ${item.source?.page_or_section || 'SOP Section'} in ${extracted.filename}`,
       source_ref: item.source?.source_ref || `S1.sec${stepNum}`,
       page_or_section: item.source?.page_or_section || 'Page 1',
@@ -893,21 +914,30 @@ export function generateLessonFromOperationalBlueprint(
   // Safely normalize critical controls to prevent undefined .toLowerCase() or missing properties
   const normalizedControls = (opBlueprint.critical_controls || [])
     .map((c: any, cIdx: number) => {
-      const rule = typeof c === 'string'
+      const rawRule = typeof c === 'string'
         ? c
         : String(c?.rule || c?.text || c?.description || c?.control || c?.name || '');
+      
+      const cleanRule = rawRule
+        .replace(/(?:sop requirement|mandatory rule|operational rule):\s*/gi, '')
+        .replace(/\|\s*controlled copy[^\n]*/gi, '')
+        .replace(/controlled copy[^\n]*/gi, '')
+        .replace(/ret-pu-sop-[a-z0-9_-]+/gi, '')
+        .replace(/\|\s*page\s*\d+[^\n]*/gi, '')
+        .replace(/\bpage\s*\d+\b/gi, '')
+        .replace(/\s*\|\s*/g, ' — ')
+        .trim();
+
       const rationale = typeof c === 'object' && c?.rationale
-        ? String(c.rationale)
-        : `Mandatory operational standard: ${rule}`;
+        ? String(c.rationale).replace(/(?:sop requirement|mandatory rule|operational rule):\s*/gi, '').trim()
+        : `Mandatory operational standard: ${cleanRule}`;
       const source_ref = typeof c === 'object' && c?.source_ref
         ? String(c.source_ref)
         : `ctrl-crit-${cIdx + 1}`;
-      const source_text = typeof c === 'object' && c?.source_text
-        ? String(c.source_text)
-        : rule;
-      return { rule: rule.trim(), rationale, source_ref, source_text };
+      const source_text = cleanRule;
+      return { rule: cleanRule, rationale, source_ref, source_text };
     })
-    .filter((c) => c.rule.length > 0);
+    .filter((c) => c.rule.length > 5 && isOperationalContent(c.rule));
 
   // Incorporate critical controls into simulator steps
   const unrepresentedControls = normalizedControls.filter((c) => {
@@ -919,10 +949,11 @@ export function generateLessonFromOperationalBlueprint(
   unrepresentedControls.forEach((c, cIdx) => {
     const stepNum = simulatorSteps.length + 1;
     const correctIdx = stepNum % 3;
-    const question = `A situation arises that may conflict with this SOP requirement: "${c.rule}". What should you do?`;
-    const correctTitle = `Follow the documented requirement: ${c.rule}`;
-    const dist1 = `Skip the requirement to finish the task faster.`;
-    const dist2 = `Invent an exception without approval from the authorised person.`;
+    const actionableRule = toActionableHeadline(c.rule);
+    const question = `A situation arises that may conflict with this standard: "${actionableRule}". What should you do?`;
+    const correctTitle = actionableRule.startsWith('Follow') ? actionableRule : `Follow the documented requirement: ${actionableRule}`;
+    const dist1 = `Skip the verification requirement to finish the task faster`;
+    const dist2 = `Invent a custom workaround without supervisor authorization`;
 
     const rawCtrlChoices = [
       { title: toActionTitle(correctTitle, 14), subtitle: 'Mandatory standard compliance requirement', isCorrect: true },
@@ -935,12 +966,12 @@ export function generateLessonFromOperationalBlueprint(
 
     simulatorSteps.push({
       id: stepNum,
-      title: `Critical Control: ${c.rule.slice(0, 35)}`,
+      title: `Critical Control: ${actionableRule.slice(0, 35)}`,
       type: 'safety',
       question,
       taskTitle: process,
       taskOrder: `Control Check ${cIdx + 1}`,
-      taskItem: c.rule,
+      taskItem: actionableRule,
       targetCode: `CTRL-${cIdx + 1}`,
       targetQty: 1,
       sku: `CTRL-${cIdx + 1}`,
@@ -951,7 +982,7 @@ export function generateLessonFromOperationalBlueprint(
         subtitle: ch.subtitle,
         isCorrect: ch.isCorrect,
       })),
-      why: c.rationale || `Mandatory operational standard: ${c.rule}`,
+      why: c.rationale || `Mandatory operational standard: ${actionableRule}`,
       coachTip: `Always enforce written compliance rule: ${c.rule}`,
       hint: `Refer to SOP compliance controls for ${process}`,
       source_ref: c.source_ref || `ctrl-crit-${cIdx + 1}`,

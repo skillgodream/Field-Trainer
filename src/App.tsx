@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Upload, BookOpen, Sparkles, ChevronRight, X } from 'lucide-react';
 import BottomNav from './components/BottomNav';
 import ScanModal from './components/ScanModal';
@@ -114,6 +114,63 @@ export default function App() {
   const [currentContextTitle, setCurrentContextTitle] = useState<string>('Standard Operating Procedure');
 
   const isPipelineProcessingRef = useRef<boolean>(false);
+
+  // Helper to persist extracted SOP to server disk repository and local cache
+  const saveToPersistentRepository = useCallback(async (lesson: Lesson) => {
+    try {
+      await fetch('/api/repository/sops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lesson }),
+      });
+      console.log(`[Repository Sync] Successfully persisted '${lesson.title}' to server repository.`);
+    } catch (err) {
+      console.warn('[Repository Sync] Failed to persist to server, falling back to local cache:', err);
+    }
+    try {
+      const cached = JSON.parse(localStorage.getItem('guruji_sop_repository') || '[]');
+      const updated = [lesson, ...cached.filter((l: any) => l.id !== lesson.id)];
+      localStorage.setItem('guruji_sop_repository', JSON.stringify(updated));
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Fetch all persisted SOPs from server repository on initial mount
+  useEffect(() => {
+    const fetchRepositorySops = async () => {
+      try {
+        const res = await fetch('/api/repository/sops');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.sops) && data.sops.length > 0) {
+          setLessons((prev) => {
+            const incomingIds = new Set(data.sops.map((s: any) => s.id));
+            const existingNonDuplicates = prev.filter((l) => !incomingIds.has(l.id));
+            return [...data.sops, ...existingNonDuplicates];
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('[Repository Sync] Could not fetch server repository:', err);
+      }
+
+      // Offline / client-side cache fallback
+      try {
+        const cached = JSON.parse(localStorage.getItem('guruji_sop_repository') || '[]');
+        if (Array.isArray(cached) && cached.length > 0) {
+          setLessons((prev) => {
+            const incomingIds = new Set(cached.map((s: any) => s.id));
+            const existingNonDuplicates = prev.filter((l) => !incomingIds.has(l.id));
+            return [...cached, ...existingNonDuplicates];
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    fetchRepositorySops();
+  }, []);
 
   // Apple Dark Theme Canvas Background Management (black and translucent cards)
   React.useEffect(() => {
@@ -246,6 +303,9 @@ export default function App() {
         }
         return [lesson, ...prev];
       });
+
+      // Persist to server disk repository & local storage cache
+      saveToPersistentRepository(lesson);
 
       setSelectedLesson(lesson);
 
@@ -617,6 +677,7 @@ export default function App() {
           setExtractedDocForModal(null);
           setSelectedLesson(lesson);
           setLessons((prev) => [lesson, ...prev.filter((l) => l.id !== lesson.id)]);
+          saveToPersistentRepository(lesson);
         }}
         onUploadNew={() => {
           setExtractedDocForModal(null);
@@ -672,11 +733,12 @@ export default function App() {
       {/* MODE 1: TRAINING DECK (Universal Teach Me Slide Deck) */}
       {isIntroDeckOpen && selectedLesson && (
         <ExperiencePlayer
+          lesson={selectedLesson}
           plan={planSlides(selectedLesson)}
           onClose={() => setIsIntroDeckOpen(false)}
           onComplete={() => {
             setIsIntroDeckOpen(false);
-            handleStartSimulation(1);
+            handleStartSimulation(0);
           }}
         />
       )}

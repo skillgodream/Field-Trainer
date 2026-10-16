@@ -128,8 +128,46 @@ function getGeminiClient(req?: express.Request): GoogleGenAI | null {
   });
 }
 
-const MODEL_PRO = process.env.GEMINI_PRO_MODEL || 'gemini-3.1-pro-preview';
-const MODEL_FAST = process.env.GEMINI_FAST_MODEL || 'gemini-3.8-flash';
+const MODEL_PRO = process.env.GEMINI_PRO_MODEL || 'gemini-3.8-flash';
+const MODEL_FAST = process.env.GEMINI_FAST_MODEL || 'gemini-3.1-flash-lite';
+
+/**
+ * Helper to call generateContent with an intelligent fallback cascade across model candidates.
+ * Prevents failure if a specific model (like gemini-3.1-pro-preview) encounters quota/credit limits (e.g. 402 RESOURCE_EXHAUSTED).
+ */
+async function generateContentWithFallback(
+  aiClient: GoogleGenAI,
+  params: {
+    contents: any;
+    config?: any;
+    preferredModel?: string;
+  }
+) {
+  const modelsToTry = [
+    params.preferredModel,
+    MODEL_PRO,
+    MODEL_FAST,
+    'gemini-3.8-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
+  ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx) as string[];
+
+  let lastErr: any = null;
+  for (const model of modelsToTry) {
+    try {
+      const response = await aiClient.models.generateContent({
+        model,
+        contents: params.contents,
+        ...(params.config ? { config: params.config } : {}),
+      });
+      return response;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`[Gemini Fallback] Model '${model}' failed:`, err?.message || err);
+    }
+  }
+  throw lastErr;
+}
 
 // Health check endpoint to diagnose deployment status and API key detection
 app.get('/api/health', (_req, res) => {
@@ -229,25 +267,12 @@ Do NOT summarize. Return JSON:
   "wordCount": estimated total words as integer
 }`;
 
-    let response;
-    try {
-      response = await aiClient.models.generateContent({
-        model: MODEL_PRO,
-        contents: { parts: [docPart, { text: prompt }] },
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-    } catch (primaryErr: any) {
-      console.warn(`[Server PDF Extract] Primary model ${MODEL_PRO} failed, trying ${MODEL_FAST}:`, primaryErr?.message);
-      response = await aiClient.models.generateContent({
-        model: MODEL_FAST,
-        contents: { parts: [docPart, { text: prompt }] },
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-    }
+    const response = await generateContentWithFallback(aiClient, {
+      contents: { parts: [docPart, { text: prompt }] },
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
 
     const outputText = response.text || '';
     let cleanJson = outputText.trim();
@@ -481,31 +506,15 @@ The number of operational_steps must emerge naturally from the SOP's actual oper
 
     parts.push({ text: textPrompt });
 
-    let response;
-    try {
-      response = await aiClient.models.generateContent({
-        model: MODEL_PRO,
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          maxOutputTokens: 32768,
-          temperature: 0.25,
-        },
-      });
-    } catch (primaryErr: any) {
-      console.warn(`[Server LLM Blueprint] Primary model ${MODEL_PRO} failed, trying ${MODEL_FAST}:`, primaryErr?.message);
-      response = await aiClient.models.generateContent({
-        model: MODEL_FAST,
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          maxOutputTokens: 32768,
-          temperature: 0.25,
-        },
-      });
-    }
+    const response = await generateContentWithFallback(aiClient, {
+      contents: { parts },
+      config: {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        maxOutputTokens: 32768,
+        temperature: 0.25,
+      },
+    });
 
     const outputText = response.text || '';
     if (!outputText.trim()) {
@@ -570,31 +579,15 @@ app.post('/api/coach', async (req, res) => {
 
     const contentsPayload = parts.length > 1 ? { parts } : prompt;
 
-    let response;
-    try {
-      response = await aiClient.models.generateContent({
-        model: MODEL_PRO,
-        contents: contentsPayload,
-        config: {
-          systemInstruction: systemInstruction || 'You are an expert assistant. Respond strictly with valid JSON.',
-          responseMimeType: 'application/json',
-          maxOutputTokens,
-          temperature,
-        },
-      });
-    } catch (primaryErr: any) {
-      console.warn(`[Server /api/coach] Primary model ${MODEL_PRO} failed, trying fallback ${MODEL_FAST}:`, primaryErr?.message);
-      response = await aiClient.models.generateContent({
-        model: MODEL_FAST,
-        contents: contentsPayload,
-        config: {
-          systemInstruction: systemInstruction || 'You are an expert assistant. Respond strictly with valid JSON.',
-          responseMimeType: 'application/json',
-          maxOutputTokens,
-          temperature,
-        },
-      });
-    }
+    const response = await generateContentWithFallback(aiClient, {
+      contents: contentsPayload,
+      config: {
+        systemInstruction: systemInstruction || 'You are an expert assistant. Respond strictly with valid JSON.',
+        responseMimeType: 'application/json',
+        maxOutputTokens,
+        temperature,
+      },
+    });
 
     const rawText = response.text || '';
     if (!rawText.trim()) {
@@ -618,6 +611,157 @@ app.post('/api/coach', async (req, res) => {
       error: 'LLM_PROVIDER_ERROR',
       message: error.message || 'Failed to generate response',
     });
+  }
+});
+
+// API Route: Generate or Match Realistic Workplace Image using Gemini 3.8 Flash Art Director
+app.post('/api/gemini/generate-image', async (req, res) => {
+  try {
+    const { prompt, title = 'Workplace Procedure', category = 'general' } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ success: false, error: 'Missing prompt' });
+    }
+
+    const aiClient = getGeminiClient(req);
+    let enhancedPrompt = prompt;
+
+    // Use Gemini 3.8 Flash as the Art Director to create an authentic photographic scene prompt
+    if (aiClient) {
+      try {
+        const directorResponse = await aiClient.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: `You are an expert industrial and workplace photographer. Convert this instructional concept into a detailed, photorealistic prompt for generating a workplace training photo.
+Concept: "${prompt}"
+SOP Context: "${title}"
+Domain: "${category}"
+
+Rules:
+1. Describe a realistic workplace scene with authentic natural lighting.
+2. Focus on the tools, equipment, or physical boundary in sharp focus with depth of field.
+3. Strictly real documentary workplace photography. No cartoon, no anime, no 3D render artifacts.
+4. Output ONLY the refined prompt text in 1-2 concise sentences.`,
+        });
+        if (directorResponse.text && directorResponse.text.trim()) {
+          enhancedPrompt = directorResponse.text.trim();
+        }
+      } catch (e: any) {
+        console.warn('[Server Image Director] Gemini 3.8 Flash prompt enhancement fallback:', e?.message || e);
+      }
+
+      // Try image generation via Google GenAI image generator (e.g. imagen-3.0-generate-002)
+      try {
+        if (typeof (aiClient.models as any)?.generateImages === 'function') {
+          const imageRes = await (aiClient.models as any).generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: enhancedPrompt,
+            config: {
+              numberOfImages: 1,
+              aspectRatio: '4:3',
+              outputMimeType: 'image/jpeg',
+            },
+          });
+
+          if (imageRes?.generatedImages?.[0]?.image?.imageBytes) {
+            const base64 = imageRes.generatedImages[0].image.imageBytes;
+            return res.json({
+              success: true,
+              imageUrl: `data:image/jpeg;base64,${base64}`,
+              enhancedPrompt,
+              source: 'ai_generated',
+            });
+          }
+        }
+      } catch (genErr: any) {
+        console.warn('[Server Imagen Generation] Imagen generation skipped or failed, falling back to library:', genErr?.message || genErr);
+      }
+    }
+
+    // Graceful fallback to verified photo library match
+    return res.json({
+      success: true,
+      enhancedPrompt,
+      source: 'library_match',
+      url: `/Guruji_Real_Photo_Visual_Library_500/001_retail_store_front.webp`,
+    });
+  } catch (err: any) {
+    console.error('[Server Image Generation Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Server image generation error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// SOP PERSISTENT REPOSITORY API
+// ---------------------------------------------------------------------------
+const REPOSITORY_DIR = path.join(process.cwd(), 'data', 'sop_repository');
+if (!fs.existsSync(REPOSITORY_DIR)) {
+  try {
+    fs.mkdirSync(REPOSITORY_DIR, { recursive: true });
+  } catch (err) {
+    console.warn('[Repository Init] Could not create repository dir:', err);
+  }
+}
+
+// GET all stored SOP modules from persistent disk
+app.get('/api/repository/sops', (_req, res) => {
+  try {
+    if (!fs.existsSync(REPOSITORY_DIR)) {
+      return res.json({ success: true, sops: [] });
+    }
+    const files = fs.readdirSync(REPOSITORY_DIR).filter((f) => f.endsWith('.json'));
+    const sops: any[] = [];
+    for (const f of files) {
+      try {
+        const content = fs.readFileSync(path.join(REPOSITORY_DIR, f), 'utf-8');
+        const parsed = JSON.parse(content);
+        if (parsed && parsed.id) {
+          sops.push(parsed);
+        }
+      } catch (readErr) {
+        console.warn(`[Repository Read Error] Failed reading ${f}:`, readErr);
+      }
+    }
+    return res.json({ success: true, sops });
+  } catch (err: any) {
+    console.error('[Repository GET Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Error fetching repository' });
+  }
+});
+
+// POST save a newly extracted SOP module to persistent disk
+app.post('/api/repository/sops', (req, res) => {
+  try {
+    const { lesson } = req.body;
+    if (!lesson || !lesson.id) {
+      return res.status(400).json({ success: false, error: 'Invalid lesson payload: missing id' });
+    }
+    if (!fs.existsSync(REPOSITORY_DIR)) {
+      fs.mkdirSync(REPOSITORY_DIR, { recursive: true });
+    }
+    const safeId = String(lesson.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filePath = path.join(REPOSITORY_DIR, `${safeId}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(lesson, null, 2), 'utf-8');
+    console.log(`[Repository Save SUCCESS] Saved SOP '${lesson.title}' (${safeId}.json) to persistent repository.`);
+    return res.json({ success: true, id: lesson.id });
+  } catch (err: any) {
+    console.error('[Repository POST Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Error saving to repository' });
+  }
+});
+
+// DELETE remove an SOP module from persistent disk
+app.delete('/api/repository/sops/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filePath = path.join(REPOSITORY_DIR, `${safeId}.json`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`[Repository Delete SUCCESS] Removed SOP ${safeId}.json`);
+    }
+    return res.json({ success: true, id });
+  } catch (err: any) {
+    console.error('[Repository DELETE Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Error deleting from repository' });
   }
 });
 
@@ -675,8 +819,7 @@ Return JSON:
   ]
 }`;
 
-    const response = await aiClient.models.generateContent({
-      model: MODEL_FAST,
+    const response = await generateContentWithFallback(aiClient, {
       contents: prompt,
       config: {
         systemInstruction: 'You are an expert instructional designer. Propose 3 tailored training structures grounded in the provided SOP. Respond strictly with valid JSON.',
@@ -823,8 +966,7 @@ Return JSON conforming strictly to:
       return res.json({ success: false, fallback: true, reason: 'No API key on server' });
     }
 
-    const response = await aiClient.models.generateContent({
-      model: MODEL_PRO,
+    const response = await generateContentWithFallback(aiClient, {
       contents: textPrompt,
       config: {
         systemInstruction,
@@ -859,8 +1001,7 @@ Return the next question, its reason, supporting references, answer options wher
       return res.json({ success: false, fallback: true });
     }
 
-    const response = await aiClient.models.generateContent({
-      model: MODEL_PRO,
+    const response = await generateContentWithFallback(aiClient, {
       contents: `Session State:\n${JSON.stringify(session).slice(0, 16000)}\nLatest Answer:\n${JSON.stringify(latestAnswer)}`,
       config: {
         systemInstruction,
@@ -892,8 +1033,7 @@ Do not add unsupported procedural details. Do not omit critical controls for the
       return res.json({ success: false, fallback: true });
     }
 
-    const response = await aiClient.models.generateContent({
-      model: MODEL_PRO,
+    const response = await generateContentWithFallback(aiClient, {
       contents: `SOP: ${filename}\nReport:\n${JSON.stringify(extractionReport).slice(0, 8000)}\nSupplementary:\n${JSON.stringify(supplementaryInstructions)}`,
       config: {
         systemInstruction,

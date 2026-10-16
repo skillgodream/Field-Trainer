@@ -23,6 +23,22 @@ interface SimulatorScreenProps {
   onAskTrainer?: () => void;
 }
 
+function clipSpeech(text: string, maxLen: number = 130): string {
+  if (!text) return 'Adhere to standard operating specifications.';
+  let clean = text
+    .replace(/(?:sop requirement|mandatory rule|operational rule):\s*/gi, '')
+    .replace(/\|\s*controlled copy[^\n]*/gi, '')
+    .replace(/controlled copy[^\n]*/gi, '')
+    .replace(/ret-pu-sop-[a-z0-9_-]+/gi, '')
+    .replace(/\|\s*page\s*\d+[^\n]*/gi, '')
+    .replace(/\bpage\s*\d+\b/gi, '')
+    .replace(/\s*\|\s*/g, ' — ')
+    .trim();
+  const firstSentence = clean.split(/(?<=[.!?])\s+/)[0] || clean;
+  if (firstSentence.length <= maxLen) return firstSentence;
+  return firstSentence.slice(0, maxLen - 1) + '…';
+}
+
 export default function SimulatorScreen({
   initialPhase = 1,
   lesson,
@@ -197,7 +213,7 @@ export default function SimulatorScreen({
 
     if (phase === 0) {
       // SHOW ME (WATCH / Demo): Coach demonstrates, learner watches.
-      setCoachSpeech(step.why || 'Watch the demonstrated action.');
+      setCoachSpeech(clipSpeech(step.why || 'Watch the demonstrated action.'));
       const timer = setTimeout(() => {
         const correctChoice = step.choices.find((c) => c.isCorrect);
         if (correctChoice) {
@@ -209,7 +225,7 @@ export default function SimulatorScreen({
       return () => clearTimeout(timer);
     } else if (phase === 1) {
       // GUIDE ME (YOUR TURN): Practice with hints
-      setCoachSpeech(step.coachTip || 'I’m watching.');
+      setCoachSpeech(clipSpeech(step.coachTip || 'I’m watching.'));
     } else {
       // TEST ME (SOLO CHECK): Solo Assessment
       setCoachSpeech('Solo Assessment: Confirm each step without hints. One attempt per line.');
@@ -245,7 +261,7 @@ export default function SimulatorScreen({
         setScore((prev) => prev + 15);
       }
 
-      setCoachSpeech(phase === 2 ? 'Done.' : step.why || 'Correct! Proceed to next step.');
+      setCoachSpeech(phase === 2 ? 'Done.' : clipSpeech(step.why || 'Correct! Proceed to next step.'));
     } else {
       sounds.playWrong();
       setCoachStatus('wrong');
@@ -540,7 +556,10 @@ export default function SimulatorScreen({
 
   // Task Card Values
   const currentItemLabel = (step as any).taskTitle || step.item || step.title;
-  const currentItemSub = (step as any).taskItem || (step.sku ? `SKU ${step.sku}` : step.coachTip || 'Standard Operating Action');
+  const rawSub = (step as any).taskItem || (step.sku ? `SKU ${step.sku}` : step.coachTip || 'Standard Operating Action');
+  const currentItemSub = typeof rawSub === 'string' && rawSub.length > 35
+    ? (step.sku ? `SKU ${step.sku}` : (step.item || 'Standard Task Action'))
+    : rawSub;
   const targetLabel = step.type === 'location' ? 'TARGET' : step.type === 'shortage' ? 'NEEDED' : step.type === 'tote' ? 'TOTE' : 'TARGET';
   const targetVal = step.targetCode || step.location || (step.targetQty ? `${step.targetQty} Units` : 'Standard Spec');
   const qtyVal = step.targetQty !== undefined ? String(step.targetQty) : (step.type === 'shortage' ? '2' : '✓');
@@ -691,12 +710,6 @@ export default function SimulatorScreen({
                     choiceStateClass = 'disabled';
                   }
 
-                  // Determine if choice represents an explicit operational decision
-                  const titleLower = choice.title.toLowerCase();
-                  const isAcceptChoice = titleLower.includes('accept') || titleLower.includes('pass') || titleLower.includes('confirm');
-                  const isRejectChoice = titleLower.includes('reject') || titleLower.includes('fail') || titleLower.includes('decline') || titleLower.includes('prohibited');
-                  const isPauseChoice = titleLower.includes('pause') || titleLower.includes('hold') || titleLower.includes('escalate');
-
                   return (
                     <button
                       key={choice.id}
@@ -713,26 +726,9 @@ export default function SimulatorScreen({
                         (selectedChoiceId !== null && phase === 2)
                       }
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {isAcceptChoice && (
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[9px] font-black uppercase">
-                              ACCEPT / PASS
-                            </span>
-                          )}
-                          {isRejectChoice && (
-                            <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/40 text-[9px] font-black uppercase">
-                              REJECT / FAIL
-                            </span>
-                          )}
-                          {isPauseChoice && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase">
-                              PAUSE / ESCALATE
-                            </span>
-                          )}
-                          <strong className="text-sm font-bold text-slate-100">{choice.title}</strong>
-                        </div>
-                        {choice.subtitle && <small className="text-xs text-slate-400 font-medium block">{choice.subtitle}</small>}
+                      <div className="flex-1 text-left">
+                        <strong className="text-sm font-bold text-slate-100 block leading-snug mb-1">{choice.title}</strong>
+                        {choice.subtitle && <small className="text-xs text-slate-400 font-medium block leading-normal">{choice.subtitle}</small>}
                       </div>
 
                       {isSelected && (
